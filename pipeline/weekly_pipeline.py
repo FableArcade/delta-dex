@@ -30,6 +30,22 @@ logger = logging.getLogger("pipeline.weekly")
 class WeeklyPipeline(DailyPipeline):
     """Weekly pipeline: PSA Pop scrape, then the full daily sequence."""
 
+    def _stage_train_model(self) -> None:
+        """Train the prediction model on latest data."""
+        if self.dry_run:
+            logger.info("[DRY RUN] would train prediction model")
+            return
+        try:
+            from pipeline.model.train import train_model
+        except ImportError as exc:
+            logger.warning("Model module not available: %s", exc)
+            self.errors.append(f"model:train: module unavailable ({exc})")
+            return
+        from db.connection import get_db
+        with get_db() as db:
+            result = train_model(db)
+            logger.info("Model training result: %s", result)
+
     def _stage_psa_pop(self) -> None:
         """Run the PSA Pop Report scraper (all set pages)."""
         if "psa_pop" in self.skip:
@@ -85,6 +101,11 @@ class WeeklyPipeline(DailyPipeline):
                 self._stage_transform()
             if self.stage in (self.STAGE_ALL, self.STAGE_COMPUTE):
                 self._stage_compute()
+
+            # 3. Model training + projection (weekly retraining)
+            if self.stage in (self.STAGE_ALL,):
+                self._run_stage("model:train", self._stage_train_model)
+                self._stage_predict()
 
             total_secs = time.time() - run_start
             print(f"\n=== Weekly pipeline finished in {total_secs:.1f}s ===")

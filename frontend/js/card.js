@@ -198,9 +198,21 @@ let currentListingRange = "all";
     setStatus("Fetching card data...");
 
     try {
-        const res = await fetch(`${API_BASE}/card/${encodeURIComponent(cardId)}?include=ebay`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        cardData = await res.json();
+        // Fetch card data and model projection in parallel
+        const [cardRes, projRes] = await Promise.all([
+            fetch(`${API_BASE}/card/${encodeURIComponent(cardId)}?include=ebay`),
+            fetch(`${API_BASE}/model/projections`).catch(() => null),
+        ]);
+        if (!cardRes.ok) throw new Error(`HTTP ${cardRes.status}`);
+        cardData = await cardRes.json();
+
+        // Attach projection data if available
+        if (projRes && projRes.ok) {
+            const projData = await projRes.json();
+            const proj = (projData.projections || {})[cardId];
+            if (proj) cardData._projection = proj;
+        }
+
         renderAll();
         setStatus("Ready");
     } catch (err) {
@@ -226,9 +238,10 @@ function renderAll() {
     renderPSAPopulation();
     renderPriceSources();
     setupIntervalButtons();
+    renderModelProjection();
     document.getElementById("window-title").textContent =
-        `POKEMETRICS.EXE - ${cardData["product-name"] || "Card Detail"}`;
-    document.title = `${cardData["product-name"] || "Card"} | POKEMETRICS`;
+        `POKEDELTA.EXE - ${cardData["product-name"] || "Card Detail"}`;
+    document.title = `${cardData["product-name"] || "Card"} | PokeDelta`;
 }
 
 /* ============================================================
@@ -1128,6 +1141,82 @@ function renderPriceSources() {
 /* ============================================================
    INTERVAL BUTTON SETUP
    ============================================================ */
+
+/* ============================================================
+   MODEL PROJECTION — 90-day return forecast with confidence band
+   ============================================================ */
+
+function renderModelProjection() {
+    const container = document.getElementById("model-projection");
+    if (!container) return;
+
+    const proj = cardData._projection;
+    if (!proj) {
+        container.style.display = "none";
+        return;
+    }
+
+    container.style.display = "";
+    const ret = proj["projected-return"];
+    const lo = proj["confidence-low"];
+    const hi = proj["confidence-high"];
+    const width = proj["confidence-width"] || (hi - lo);
+    const contribs = proj["feature-contributions"] || {};
+
+    // Projected return
+    const retEl = document.getElementById("proj-return");
+    if (retEl && ret !== null && Number.isFinite(ret)) {
+        const sign = ret > 0 ? "+" : "";
+        retEl.textContent = sign + (ret * 100).toFixed(1) + "%";
+        retEl.style.color = ret > 0.05 ? "#006400" : ret < -0.05 ? "#880000" : "#404040";
+    }
+
+    // Confidence band
+    const bandEl = document.getElementById("proj-band");
+    if (bandEl && lo !== null && hi !== null) {
+        bandEl.textContent = (lo * 100).toFixed(0) + "% to " + (hi * 100).toFixed(0) + "%";
+    }
+
+    // Confidence label
+    const confEl = document.getElementById("proj-confidence");
+    if (confEl) {
+        const label = width < 0.15 ? "HIGH" : width < 0.30 ? "MEDIUM" : "LOW";
+        confEl.textContent = label;
+        confEl.style.color = width < 0.15 ? "#006400" : width < 0.30 ? "#806000" : "#880000";
+    }
+
+    // Feature waterfall — top 5 contributors
+    const waterfallEl = document.getElementById("proj-waterfall");
+    if (waterfallEl) {
+        while (waterfallEl.firstChild) waterfallEl.removeChild(waterfallEl.firstChild);
+        const entries = Object.entries(contribs).slice(0, 5);
+        for (const [name, val] of entries) {
+            const row = document.createElement("div");
+            row.style.cssText = "display:flex;align-items:center;gap:6px;padding:2px 0;font-size:11px;";
+
+            const nameSpan = document.createElement("span");
+            nameSpan.style.cssText = "width:130px;text-align:right;font-weight:bold;color:#404040;";
+            nameSpan.textContent = name.replace(/_/g, " ");
+
+            const valSpan = document.createElement("span");
+            valSpan.style.cssText = "font-variant-numeric:tabular-nums;min-width:60px;";
+            const sign = val > 0 ? "+" : "";
+            valSpan.textContent = sign + (val * 100).toFixed(1) + "%";
+            valSpan.style.color = val > 0 ? "#006400" : "#880000";
+
+            row.appendChild(nameSpan);
+            row.appendChild(valSpan);
+            waterfallEl.appendChild(row);
+        }
+    }
+
+    // Model version
+    const verEl = document.getElementById("proj-version");
+    if (verEl) {
+        verEl.textContent = "Model: " + (proj["model-version"] || "unknown") +
+            " | As of: " + (proj["as-of"] || "unknown");
+    }
+}
 
 function setupIntervalButtons() {
     // Price chart intervals

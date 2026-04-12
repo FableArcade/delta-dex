@@ -126,6 +126,7 @@ class DailyPipeline:
     STAGE_SCRAPE = "scrape"
     STAGE_TRANSFORM = "transform"
     STAGE_COMPUTE = "compute"
+    STAGE_PREDICT = "predict"
 
     def __init__(
         self,
@@ -367,6 +368,28 @@ class DailyPipeline:
             ),
         )
 
+    # -------------------- prediction --------------------
+
+    def _stage_predict(self) -> None:
+        """Stage 6: generate model projections for all active cards."""
+        if self.dry_run:
+            self._run_stage("predict:projections",
+                            lambda: logger.info("[DRY RUN] would generate model projections"))
+            return
+
+        def _run_predict():
+            try:
+                from pipeline.model.predict import generate_projections
+            except ImportError as exc:
+                logger.warning("Model module not available: %s", exc)
+                self.errors.append(f"predict: model module unavailable ({exc})")
+                return
+            with get_db() as db:
+                result = generate_projections(db)
+                logger.info("Projections: %s", result)
+
+        self._run_stage("predict:projections", _run_predict)
+
     # -------------------- main run --------------------
 
     def run(self) -> int:
@@ -394,6 +417,9 @@ class DailyPipeline:
 
             if self.stage in (self.STAGE_ALL, self.STAGE_COMPUTE):
                 self._stage_compute()
+
+            if self.stage in (self.STAGE_ALL, self.STAGE_PREDICT):
+                self._stage_predict()
 
             total_secs = time.time() - run_start
             print(f"\n=== Pipeline finished in {total_secs:.1f}s ===")
@@ -499,7 +525,7 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--date", default=None,
                    help="Target date YYYY-MM-DD (default: today)")
     p.add_argument("--stage",
-                   choices=["all", "scrape", "transform", "compute"],
+                   choices=["all", "scrape", "transform", "compute", "predict"],
                    default="all",
                    help="Which stage group to run (default: all)")
     p.add_argument("--skip", action="append", default=[],

@@ -8,14 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from api.routers import health, leaderboard, sets, cards, sealed
+from api.routers import health, leaderboard, sets, cards, sealed, model
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
 app = FastAPI(
-    title="Pokemon Analytics API",
-    description="Collectrics-compatible Pokemon TCG analytics",
-    version="1.0.0",
+    title="PokeDelta API",
+    description="Data-driven Pokemon TCG investment analytics — Delta Edition",
+    version="2.0.0",
 )
 
 
@@ -51,6 +51,7 @@ app.include_router(leaderboard.router, prefix="/api", tags=["leaderboard"])
 app.include_router(sets.router, prefix="/api", tags=["sets"])
 app.include_router(cards.router, prefix="/api", tags=["cards"])
 app.include_router(sealed.router, prefix="/api", tags=["sealed"])
+app.include_router(model.router, prefix="/api", tags=["model"])
 
 
 # Serve frontend static files
@@ -96,6 +97,10 @@ if FRONTEND_DIR.exists():
     @app.get("/about.html")
     def serve_about():
         return FileResponse(FRONTEND_DIR / "about.html")
+
+    @app.get("/report_card.html")
+    def serve_report_card():
+        return FileResponse(FRONTEND_DIR / "report_card.html")
 
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIR)), name="frontend")
 else:

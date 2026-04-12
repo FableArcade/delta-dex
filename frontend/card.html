@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>POKEMETRICS.EXE - Card Detail</title>
+    <title>PokeDelta - POKEMETRICS.EXE - Card Detail</title>
     <link rel="stylesheet" href="css/win98.css">
     <link rel="stylesheet" href="css/retro-screen.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -373,6 +373,7 @@
     </style>
 </head>
 <body>
+<div class="delta-badge">DELTA EDITION</div>
 
 <div class="desktop">
 
@@ -400,6 +401,7 @@
             <a href="/wishlist.html" class="menu-item">Wishlist</a>
             <a href="/search.html" class="menu-item">Search</a>
             <a href="/calculator.html" class="menu-item">Calculator</a>
+            <a href="/report_card.html" class="menu-item">Report Card</a>
             <a href="/about.html" class="menu-item">Help</a>
         </div>
 
@@ -468,6 +470,38 @@
                             <div class="stat-box-value small" id="stat-volatility">---</div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- MODEL PROJECTION (PokeDelta) -->
+        <!-- ============================================================ -->
+        <div class="window-body" id="model-projection" style="display:none;">
+            <div class="window">
+                <div class="window-title" style="background: linear-gradient(90deg, #806000, #c09000);">
+                    <span class="window-title-text">C:\MODEL_PROJECTION.DAT - 90-Day Forecast</span>
+                </div>
+                <div class="window-body" style="padding: 12px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 12px;">
+                        <div>
+                            <div style="font-size:10px;font-weight:bold;text-transform:uppercase;color:#606060;">Projected 90d Return</div>
+                            <div id="proj-return" style="font-size:32px;font-weight:bold;font-variant-numeric:tabular-nums;">&mdash;</div>
+                        </div>
+                        <div>
+                            <div style="font-size:10px;font-weight:bold;text-transform:uppercase;color:#606060;">Confidence Band (25th-75th)</div>
+                            <div id="proj-band" style="font-size:20px;font-weight:bold;color:#404040;">&mdash;</div>
+                        </div>
+                        <div>
+                            <div style="font-size:10px;font-weight:bold;text-transform:uppercase;color:#606060;">Model Confidence</div>
+                            <div id="proj-confidence" style="font-size:20px;font-weight:bold;">&mdash;</div>
+                        </div>
+                    </div>
+                    <div style="border-top: 1px solid #c0c0c0; padding-top: 8px;">
+                        <div style="font-size:10px;font-weight:bold;text-transform:uppercase;color:#606060;margin-bottom:4px;">Why This Projection (Top Drivers)</div>
+                        <div id="proj-waterfall"></div>
+                    </div>
+                    <div id="proj-version" style="font-size:10px;color:#808080;margin-top:8px;"></div>
                 </div>
             </div>
         </div>

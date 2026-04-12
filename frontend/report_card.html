@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PokeDelta - MODEL_REPORT_CARD.EXE</title>
+    <link rel="stylesheet" href="css/win98.css">
+    <link rel="stylesheet" href="css/retro-screen.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .report-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 12px;
+            padding: 12px;
+        }
+        .metric-card {
+            background: var(--win-white);
+            box-shadow: var(--bevel-sunken);
+            padding: 12px 16px;
+        }
+        .metric-label {
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #606060;
+            margin-bottom: 4px;
+        }
+        .metric-value {
+            font-size: 28px;
+            font-weight: bold;
+            font-variant-numeric: tabular-nums;
+        }
+        .metric-value.good { color: #006400; }
+        .metric-value.neutral { color: #404040; }
+        .metric-value.bad { color: #880000; }
+        .metric-sub {
+            font-size: 11px;
+            color: #808080;
+            margin-top: 2px;
+        }
+        .decile-chart-wrap {
+            position: relative;
+            height: 300px;
+            background: var(--win-white);
+            box-shadow: var(--bevel-sunken);
+            padding: 8px;
+            margin: 12px;
+        }
+        .decile-chart-wrap canvas { width: 100% !important; height: 100% !important; }
+        .feat-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 3px 0;
+            font-size: 11px;
+        }
+        .feat-bar-name {
+            width: 160px;
+            text-align: right;
+            font-weight: bold;
+            color: #404040;
+        }
+        .feat-bar-fill {
+            height: 16px;
+            background: #4080c0;
+            box-shadow: var(--bevel-raised);
+            min-width: 2px;
+        }
+        .feat-bar-pct {
+            font-variant-numeric: tabular-nums;
+            color: #606060;
+            min-width: 40px;
+        }
+        .no-model-msg {
+            padding: 40px;
+            text-align: center;
+            font-size: 14px;
+            color: #808080;
+        }
+        .no-model-msg b { color: #404040; }
+    </style>
+</head>
+<body>
+<div class="delta-badge">DELTA EDITION</div>
+
+<div class="desktop">
+    <div class="window" style="max-width: 1100px; margin: 0 auto;">
+        <div class="window-title">
+            <span class="window-title-text">MODEL_REPORT_CARD.EXE - Prediction Accuracy</span>
+            <div class="window-controls">
+                <button class="window-btn">_</button>
+                <button class="window-btn">&square;</button>
+                <button class="window-btn">X</button>
+            </div>
+        </div>
+
+        <div class="menubar">
+            <a href="/" class="menu-item">Leaderboard</a>
+            <a href="/card_leaderboard.html" class="menu-item">Cards</a>
+            <a href="/sealed_leaderboard.html" class="menu-item">Sealed</a>
+            <a href="/sets.html" class="menu-item">Sets</a>
+            <a href="/wishlist.html" class="menu-item">Wishlist</a>
+            <a href="/search.html" class="menu-item">Search</a>
+            <a href="/calculator.html" class="menu-item">Calculator</a>
+            <a href="/report_card.html" class="menu-item" style="font-weight:bold;">Report Card</a>
+            <a href="/about.html" class="menu-item">Help</a>
+        </div>
+
+        <div class="window-body" style="border-bottom: 2px groove var(--win-surface);">
+            <div class="hero-text">
+                <div class="hero-title">model report card</div>
+                <div class="hero-subtitle">
+                    How accurate is the prediction model? Backtested on out-of-sample data the model has never seen.
+                    These numbers prove whether the projections are trustworthy.
+                </div>
+            </div>
+        </div>
+
+        <div id="report-content">
+            <div class="no-model-msg" id="loading-msg">Loading report card...</div>
+        </div>
+
+        <div class="statusbar">
+            <div class="statusbar-field" id="status-msg">Ready</div>
+            <div class="statusbar-field" style="flex:1" id="status-model"></div>
+        </div>
+    </div>
+</div>
+
+<div class="taskbar">
+    <button class="start-btn">
+        <span style="font-size:14px;">&#9733;</span> Start
+    </button>
+    <div class="taskbar-divider"></div>
+    <button class="taskbar-task active">MODEL_REPORT_CARD.EXE</button>
+    <div class="taskbar-clock" id="clock"></div>
+</div>
+
+<script>
+const API_BASE = "/api";
+
+function pctFmt(v, digits) {
+    if (v === null || v === undefined) return "\u2014";
+    return (v * 100).toFixed(digits || 1) + "%";
+}
+
+// Escape for safe insertion into the DOM
+function esc(s) {
+    if (s == null) return "";
+    return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+async function loadReportCard() {
+    const container = document.getElementById("report-content");
+    try {
+        const res = await fetch(`${API_BASE}/model/report-card`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        if (!data.available) {
+            container.textContent = "";
+            const msg = document.createElement("div");
+            msg.className = "no-model-msg";
+            msg.innerHTML = "<b>No model trained yet.</b><br><br>" +
+                "Run the training pipeline to generate the report card:<br>" +
+                "<code style='background:#e8e8e8;padding:4px 8px;'>python -m pipeline.model.train</code>";
+            container.appendChild(msg);
+            return;
+        }
+
+        const r2 = data["r-squared-oos"];
+        const spearman = data["spearman-oos"];
+        const topDec = data["mean-return-top-decile"];
+        const botDec = data["mean-return-bottom-decile"];
+        const spread = data["decile-spread"];
+        const hitRate = data["hit-rate-positive"];
+        const calibration = data["calibration"] || [];
+        const importance = data["feature-importance"] || {};
+
+        container.textContent = "";
+
+        // --- Metric cards ---
+        const grid = document.createElement("div");
+        grid.className = "report-grid";
+
+        const metrics = [
+            { label: "R-Squared (Out of Sample)", value: r2.toFixed(4),
+              cls: r2 > 0.05 ? "good" : r2 > 0 ? "neutral" : "bad",
+              sub: "How much variance the model explains. > 0.05 is respectable for asset returns." },
+            { label: "Spearman Rank Correlation", value: spearman.toFixed(4),
+              cls: spearman > 0.15 ? "good" : spearman > 0.05 ? "neutral" : "bad",
+              sub: "How well the model ranks cards from best to worst. > 0.15 is strong." },
+            { label: "Hit Rate (Predicted Positive)", value: pctFmt(hitRate),
+              cls: hitRate > 0.55 ? "good" : hitRate > 0.50 ? "neutral" : "bad",
+              sub: "Of cards the model said would go up, what % actually did. > 55% beats coin flip." },
+            { label: "Decile Spread", value: pctFmt(spread),
+              cls: spread > 0.10 ? "good" : spread > 0.05 ? "neutral" : "bad",
+              sub: "Top decile avg return minus bottom decile. > 10% means the model discriminates." },
+            { label: "Top Decile Avg Return", value: pctFmt(topDec),
+              cls: topDec > 0 ? "good" : "bad",
+              sub: "Average 90-day return of the cards the model liked most." },
+            { label: "Bottom Decile Avg Return", value: pctFmt(botDec),
+              cls: botDec < 0 ? "good" : "bad",
+              sub: "Average 90-day return of the cards the model liked least." },
+        ];
+
+        for (const m of metrics) {
+            const card = document.createElement("div");
+            card.className = "metric-card";
+            const lbl = document.createElement("div");
+            lbl.className = "metric-label";
+            lbl.textContent = m.label;
+            const val = document.createElement("div");
+            val.className = "metric-value " + m.cls;
+            val.textContent = m.value;
+            card.appendChild(lbl);
+            card.appendChild(val);
+            if (m.sub) {
+                const sub = document.createElement("div");
+                sub.className = "metric-sub";
+                sub.textContent = m.sub;
+                card.appendChild(sub);
+            }
+            grid.appendChild(card);
+        }
+        container.appendChild(grid);
+
+        // --- Decile chart ---
+        if (calibration.length > 0) {
+            const chartTitle = document.createElement("div");
+            chartTitle.style.cssText = "padding:12px 12px 0;font-size:12px;font-weight:bold;text-transform:uppercase;color:#404040;";
+            chartTitle.textContent = "Predicted vs Actual Returns by Decile";
+            container.appendChild(chartTitle);
+
+            const chartWrap = document.createElement("div");
+            chartWrap.className = "decile-chart-wrap";
+            const canvas = document.createElement("canvas");
+            canvas.id = "decile-chart";
+            chartWrap.appendChild(canvas);
+            container.appendChild(chartWrap);
+
+            new Chart(canvas.getContext("2d"), {
+                type: "bar",
+                data: {
+                    labels: calibration.map(function(d) { return "D" + d.decile; }),
+                    datasets: [
+                        {
+                            label: "Predicted",
+                            data: calibration.map(function(d) { return (d.mean_predicted * 100).toFixed(1); }),
+                            backgroundColor: "rgba(64, 128, 192, 0.6)",
+                            borderColor: "rgba(64, 128, 192, 1)",
+                            borderWidth: 1,
+                        },
+                        {
+                            label: "Actual",
+                            data: calibration.map(function(d) { return (d.mean_actual * 100).toFixed(1); }),
+                            backgroundColor: "rgba(0, 128, 0, 0.6)",
+                            borderColor: "rgba(0, 128, 0, 1)",
+                            borderWidth: 1,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: "top" } },
+                    scales: {
+                        y: { title: { display: true, text: "90-Day Return (%)" } },
+                        x: { title: { display: true, text: "Model Decile (1=worst, 10=best)" } },
+                    },
+                },
+            });
+        }
+
+        // --- Feature importance ---
+        const featureEntries = Object.entries(importance).slice(0, 12);
+        if (featureEntries.length > 0) {
+            const featTitle = document.createElement("div");
+            featTitle.style.cssText = "padding:12px 12px 0;font-size:12px;font-weight:bold;text-transform:uppercase;color:#404040;";
+            featTitle.textContent = "What Drives the Predictions";
+            container.appendChild(featTitle);
+
+            const featWrap = document.createElement("div");
+            featWrap.style.cssText = "padding:8px 12px 16px;";
+            const maxPct = featureEntries[0][1];
+            for (const [name, val] of featureEntries) {
+                const barW = Math.max(2, (val / maxPct) * 300);
+                const row = document.createElement("div");
+                row.className = "feat-bar";
+
+                const nameSpan = document.createElement("span");
+                nameSpan.className = "feat-bar-name";
+                nameSpan.textContent = name.replace(/_/g, " ");
+
+                const fill = document.createElement("div");
+                fill.className = "feat-bar-fill";
+                fill.style.width = barW + "px";
+
+                const pctSpan = document.createElement("span");
+                pctSpan.className = "feat-bar-pct";
+                pctSpan.textContent = val + "%";
+
+                row.appendChild(nameSpan);
+                row.appendChild(fill);
+                row.appendChild(pctSpan);
+                featWrap.appendChild(row);
+            }
+            container.appendChild(featWrap);
+        }
+
+        // --- Model info footer ---
+        const footer = document.createElement("div");
+        footer.style.cssText = "padding:8px 12px;font-size:11px;color:#808080;border-top:1px solid #c0c0c0;";
+        footer.textContent = "Model: " + esc(data["model-version"]) +
+            " | Trained: " + esc(data["as-of"]) +
+            " | Horizon: " + data["horizon-days"] + "d" +
+            " | Samples: " + data["total-samples"];
+        container.appendChild(footer);
+
+        document.getElementById("status-model").textContent =
+            "Model " + data["model-version"] + " | Last trained " + data["as-of"];
+
+    } catch (err) {
+        console.error(err);
+        container.textContent = "";
+        const msg = document.createElement("div");
+        msg.className = "no-model-msg";
+        const b = document.createElement("b");
+        b.textContent = "Error loading report card.";
+        msg.appendChild(b);
+        msg.appendChild(document.createElement("br"));
+        msg.appendChild(document.createTextNode(err.message));
+        container.appendChild(msg);
+    }
+}
+
+loadReportCard();
+
+function updateClock() {
+    var now = new Date();
+    var h = now.getHours();
+    var m = String(now.getMinutes()).padStart(2, '0');
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    document.getElementById('clock').textContent = (h % 12 || 12) + ":" + m + " " + ampm;
+}
+updateClock();
+setInterval(updateClock, 60000);
+</script>
+</body>
+</html>

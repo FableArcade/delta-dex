@@ -1,0 +1,470 @@
+"""Feature engineering for PokeDelta prediction model.
+
+Assembles training datasets from historical price data and generates
+feature vectors for live inference. All features use only data available
+at-or-before the anchor date (no future leakage).
+"""
+
+from __future__ import annotations
+
+import logging
+import math
+import sqlite3
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
+import pandas as pd
+
+logger = logging.getLogger("pipeline.model.features")
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+MIN_PSA10_PRICE = 20.0
+MIN_TRAILING_DAYS = 90
+MIN_FORWARD_DAYS = 90
+HORIZON_DAYS = 90
+OUTLIER_TRIM_PCT = 0.01  # trim top/bottom 1% of targets
+
+# Cultural impact scoring (ported from card_leaderboard.js)
+ICONIC_NAMES: Dict[str, float] = {
+    "charizard": 1.00, "pikachu": 1.00, "mewtwo": 0.96, "mew": 0.96,
+    "umbreon": 0.96, "lugia": 0.88, "rayquaza": 0.88, "gengar": 0.85,
+    "snorlax": 0.82, "dragonite": 0.82, "eevee": 0.78, "sylveon": 0.78,
+    "espeon": 0.75, "vaporeon": 0.72, "jolteon": 0.72, "flareon": 0.70,
+    "glaceon": 0.70, "leafeon": 0.70, "gardevoir": 0.68, "lucario": 0.68,
+    "arcanine": 0.65, "gyarados": 0.65, "blastoise": 0.65,
+    "venusaur": 0.62, "alakazam": 0.60, "machamp": 0.58,
+    "cynthia": 0.75, "lillie": 0.72, "iono": 0.68, "marnie": 0.65,
+    "n ": 0.60, "professor": 0.55,
+}
+
+RARITY_BONUS: Dict[str, float] = {
+    "SIR": 0.20, "MHR": 0.18, "HR": 0.12, "SCR": 0.12, "RR": 0.10,
+    "GR": 0.10, "IR": 0.08, "UR": 0.05,
+}
+
+
+def cultural_score(product_name: str, rarity_code: Optional[str]) -> float:
+    name_lower = product_name.lower()
+    name_score = 0.0
+    for key, val in ICONIC_NAMES.items():
+        if key in name_lower:
+            name_score = max(name_score, val)
+            break
+    bonus = RARITY_BONUS.get(rarity_code or "", 0.0)
+    return min(1.0, name_score + bonus)
+
+
+# ---------------------------------------------------------------------------
+# Historical training dataset
+# ---------------------------------------------------------------------------
+
+def build_training_dataset(db: sqlite3.Connection) -> pd.DataFrame:
+    """Build training dataset from all historical price data.
+
+    For each card, walks through monthly anchors and computes features
+    using only trailing data, with the target being 90-day forward return.
+
+    Returns a DataFrame with one row per (card, anchor_date) sample.
+    """
+    logger.info("Building training dataset...")
+
+    # Load all cards (non-sealed only)
+    cards = db.execute(
+        "SELECT id, product_name, rarity_code FROM cards "
+        "WHERE sealed_product = 'N'"
+    ).fetchall()
+    logger.info("Found %d non-sealed cards", len(cards))
+
+    # Pre-compute cultural scores
+    cultural_scores = {
+        r["id"]: cultural_score(r["product_name"], r["rarity_code"])
+        for r in cards
+    }
+    card_ids = [r["id"] for r in cards]
+
+    # Load all price history into a DataFrame for fast access
+    price_df = pd.read_sql_query(
+        "SELECT card_id, date, raw_price, psa_10_price, psa_9_price, "
+        "psa_8_price, sales_volume "
+        "FROM price_history WHERE card_id IN ({}) "
+        "ORDER BY card_id, date".format(
+            ",".join("?" for _ in card_ids)
+        ),
+        db,
+        params=card_ids,
+    )
+    price_df["date"] = pd.to_datetime(price_df["date"])
+    logger.info("Loaded %d price history rows", len(price_df))
+
+    # Load PSA pop history
+    psa_df = pd.read_sql_query(
+        "SELECT card_id, date, psa_10_base, total_base, gem_pct "
+        "FROM psa_pop_history WHERE card_id IN ({}) "
+        "ORDER BY card_id, date".format(
+            ",".join("?" for _ in card_ids)
+        ),
+        db,
+        params=card_ids,
+    )
+    psa_df["date"] = pd.to_datetime(psa_df["date"])
+
+    # Load market pressure (latest per card per window)
+    mp_df = pd.read_sql_query(
+        "SELECT card_id, window_days, net_flow_pct, demand_pressure, "
+        "supply_pressure, as_of "
+        "FROM market_pressure WHERE mode = 'observed'",
+        db,
+    )
+
+    # Load supply saturation
+    ss_df = pd.read_sql_query(
+        "SELECT card_id, supply_saturation_index, as_of "
+        "FROM supply_saturation WHERE mode = 'observed'",
+        db,
+    )
+
+    samples = []
+    for card_id in card_ids:
+        card_prices = price_df[price_df["card_id"] == card_id].copy()
+        if len(card_prices) < 2:
+            continue
+
+        card_prices = card_prices.set_index("date").sort_index()
+
+        # Filter to rows with valid PSA 10 price
+        valid = card_prices[card_prices["psa_10_price"].notna() &
+                            (card_prices["psa_10_price"] >= MIN_PSA10_PRICE)]
+        if len(valid) < 7:  # need enough history
+            continue
+
+        # Monthly resampling: first observation per month
+        monthly = valid.resample("MS").first().dropna(subset=["psa_10_price"])
+        if len(monthly) < 6:
+            continue
+
+        dates = monthly.index.tolist()
+        cult_score = cultural_scores.get(card_id, 0.0)
+
+        # Get PSA data for this card
+        card_psa = psa_df[psa_df["card_id"] == card_id].set_index("date").sort_index()
+
+        for i in range(3, len(dates)):
+            anchor_date = dates[i]
+            # Check forward runway
+            forward_date = anchor_date + pd.Timedelta(days=HORIZON_DAYS)
+            # Find closest price to forward_date
+            future_prices = valid[valid.index >= forward_date]
+            if future_prices.empty:
+                continue
+            forward_price = future_prices.iloc[0]["psa_10_price"]
+            anchor_price = monthly.loc[anchor_date, "psa_10_price"]
+
+            if anchor_price <= 0 or forward_price <= 0:
+                continue
+
+            target = (forward_price - anchor_price) / anchor_price
+
+            # Compute features at anchor date
+            trailing = valid[valid.index <= anchor_date]
+            if len(trailing) < 7:
+                continue
+
+            features = _compute_features_at_date(
+                trailing, anchor_price, anchor_date, cult_score, card_psa,
+                mp_df[mp_df["card_id"] == card_id],
+                ss_df[ss_df["card_id"] == card_id],
+            )
+            if features is None:
+                continue
+
+            features["card_id"] = card_id
+            features["anchor_date"] = anchor_date.isoformat()[:10]
+            features["target_return_90d"] = target
+            samples.append(features)
+
+    df = pd.DataFrame(samples)
+    logger.info("Raw samples: %d", len(df))
+
+    if df.empty:
+        return df
+
+    # Trim outliers on target
+    lo = df["target_return_90d"].quantile(OUTLIER_TRIM_PCT)
+    hi = df["target_return_90d"].quantile(1 - OUTLIER_TRIM_PCT)
+    df = df[(df["target_return_90d"] >= lo) & (df["target_return_90d"] <= hi)]
+    logger.info("After outlier trim: %d samples", len(df))
+
+    return df
+
+
+def _compute_features_at_date(
+    trailing: pd.DataFrame,
+    current_price: float,
+    anchor_date: pd.Timestamp,
+    cult_score: float,
+    card_psa: pd.DataFrame,
+    card_mp: pd.DataFrame,
+    card_ss: pd.DataFrame,
+) -> Optional[Dict[str, Any]]:
+    """Compute the 20-feature vector using only data at/before anchor_date."""
+
+    prices = trailing["psa_10_price"]
+    raw_prices = trailing["raw_price"]
+
+    # Price-derived features
+    p_30d = _price_at_offset(trailing, anchor_date, 30)
+    p_90d = _price_at_offset(trailing, anchor_date, 90)
+    p_365d = _price_at_offset(trailing, anchor_date, 365)
+
+    max_1y = prices[prices.index >= anchor_date - pd.Timedelta(days=365)].max()
+    min_1y_series = prices[(prices.index >= anchor_date - pd.Timedelta(days=365)) & (prices > 0)]
+    min_1y = min_1y_series.min() if len(min_1y_series) > 0 else current_price
+
+    ret_30d = (current_price / p_30d - 1) if p_30d and p_30d > 0 else 0.0
+    ret_90d = (current_price / p_90d - 1) if p_90d and p_90d > 0 else 0.0
+    ret_365d = (current_price / p_365d - 1) if p_365d and p_365d > 0 else 0.0
+
+    peak_discount = (max_1y - current_price) / max_1y if max_1y > 0 else 0.0
+    trough_recovery = (current_price - min_1y) / min_1y if min_1y > 0 else 0.0
+    volatility = (max_1y - min_1y) / current_price if current_price > 0 else 0.0
+
+    # Moving average distance
+    anchors = [p for p in [p_30d, p_90d, p_365d] if p and p > 0]
+    ma = np.mean(anchors) if anchors else current_price
+    ma_distance = (ma - current_price) / ma if ma > 0 else 0.0
+
+    log_price = math.log10(max(current_price, 1.0))
+
+    # Demand/supply features (use latest available before anchor)
+    nf_7d = _get_mp_feature(card_mp, 7, "net_flow_pct")
+    nf_30d = _get_mp_feature(card_mp, 30, "net_flow_pct")
+    dp_7d = _get_mp_feature(card_mp, 7, "demand_pressure")
+    dp_30d = _get_mp_feature(card_mp, 30, "demand_pressure")
+    sp_30d = _get_mp_feature(card_mp, 30, "supply_pressure")
+    ds_ratio = dp_30d / sp_30d if sp_30d and sp_30d > 0 else 1.0
+
+    sat_index = _get_ss_feature(card_ss)
+
+    # PSA scarcity
+    gem_pct = _get_latest_psa(card_psa, anchor_date, "gem_pct")
+    psa_10_pop = _get_latest_psa(card_psa, anchor_date, "psa_10_base")
+
+    # PSA 10 premium
+    current_raw = raw_prices.iloc[-1] if len(raw_prices) > 0 and pd.notna(raw_prices.iloc[-1]) else None
+    psa_10_vs_raw_pct = ((current_price / current_raw - 1) * 100
+                          if current_raw and current_raw > 0 else 0.0)
+
+    # History coverage
+    history_days = len(prices[prices.index >= anchor_date - pd.Timedelta(days=365)])
+
+    return {
+        "ret_30d": ret_30d,
+        "ret_90d": ret_90d,
+        "ret_365d": ret_365d,
+        "peak_discount": max(0, peak_discount),
+        "trough_recovery": max(0, trough_recovery),
+        "volatility": max(0, volatility),
+        "ma_distance": ma_distance,
+        "log_price": log_price,
+        "net_flow_pct_7d": nf_7d or 0.0,
+        "net_flow_pct_30d": nf_30d or 0.0,
+        "demand_pressure_7d": dp_7d or 0.0,
+        "demand_pressure_30d": dp_30d or 0.0,
+        "supply_saturation_index": sat_index or 1.0,
+        "ds_ratio": ds_ratio,
+        "gem_pct": gem_pct or 0.10,
+        "psa_10_pop": psa_10_pop or 0.0,
+        "psa_10_vs_raw_pct": psa_10_vs_raw_pct,
+        "cultural_score": cult_score,
+        "rarity_tier": 0.0,  # will be set by caller if needed
+        "history_days": float(history_days),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Live inference feature vector
+# ---------------------------------------------------------------------------
+
+FEATURE_COLUMNS = [
+    "ret_30d", "ret_90d", "ret_365d", "peak_discount", "trough_recovery",
+    "volatility", "ma_distance", "log_price", "net_flow_pct_7d",
+    "net_flow_pct_30d", "demand_pressure_7d", "demand_pressure_30d",
+    "supply_saturation_index", "ds_ratio", "gem_pct", "psa_10_pop",
+    "psa_10_vs_raw_pct", "cultural_score", "rarity_tier", "history_days",
+]
+
+
+def build_live_features(db: sqlite3.Connection) -> pd.DataFrame:
+    """Build feature vectors for all active cards using current DB state.
+
+    Returns a DataFrame indexed by card_id with FEATURE_COLUMNS.
+    """
+    logger.info("Building live feature vectors...")
+
+    # Use the same card_index query pattern as the API
+    rows = db.execute("""
+        SELECT
+            c.id, c.product_name, c.rarity_code, c.sealed_product,
+            ph.raw_price, ph.psa_10_price, ph.psa_10_vs_raw_pct,
+            pp.gem_pct, pp.psa_10_base,
+            mp30.net_flow_pct AS nf_30d,
+            mp30.demand_pressure AS dp_30d,
+            mp30.supply_pressure AS sp_30d,
+            mp7.net_flow_pct AS nf_7d,
+            mp7.demand_pressure AS dp_7d,
+            ss.supply_saturation_index,
+            (SELECT raw_price FROM price_history
+              WHERE card_id = c.id AND date <= date('now', '-30 days')
+                AND raw_price IS NOT NULL
+              ORDER BY date DESC LIMIT 1) AS raw_30d_ago,
+            (SELECT raw_price FROM price_history
+              WHERE card_id = c.id AND date <= date('now', '-90 days')
+                AND raw_price IS NOT NULL
+              ORDER BY date DESC LIMIT 1) AS raw_90d_ago,
+            (SELECT raw_price FROM price_history
+              WHERE card_id = c.id AND date <= date('now', '-365 days')
+                AND raw_price IS NOT NULL
+              ORDER BY date DESC LIMIT 1) AS raw_365d_ago,
+            (SELECT psa_10_price FROM price_history
+              WHERE card_id = c.id AND date <= date('now', '-30 days')
+                AND psa_10_price IS NOT NULL
+              ORDER BY date DESC LIMIT 1) AS psa10_30d_ago,
+            (SELECT psa_10_price FROM price_history
+              WHERE card_id = c.id AND date <= date('now', '-90 days')
+                AND psa_10_price IS NOT NULL
+              ORDER BY date DESC LIMIT 1) AS psa10_90d_ago,
+            (SELECT psa_10_price FROM price_history
+              WHERE card_id = c.id AND date <= date('now', '-365 days')
+                AND psa_10_price IS NOT NULL
+              ORDER BY date DESC LIMIT 1) AS psa10_365d_ago,
+            (SELECT MAX(psa_10_price) FROM price_history
+              WHERE card_id = c.id AND date >= date('now', '-365 days')) AS psa10_max_1y,
+            (SELECT MIN(psa_10_price) FROM price_history
+              WHERE card_id = c.id AND date >= date('now', '-365 days')
+                AND psa_10_price > 0) AS psa10_min_1y,
+            (SELECT COUNT(DISTINCT date) FROM price_history
+              WHERE card_id = c.id AND date >= date('now', '-365 days')) AS history_days
+        FROM cards c
+        LEFT JOIN price_history ph
+            ON ph.card_id = c.id
+            AND ph.date = (SELECT MAX(date) FROM price_history WHERE card_id = c.id)
+        LEFT JOIN psa_pop_history pp
+            ON pp.card_id = c.id
+            AND pp.date = (SELECT MAX(date) FROM psa_pop_history WHERE card_id = c.id)
+        LEFT JOIN market_pressure mp30
+            ON mp30.card_id = c.id AND mp30.window_days = 30 AND mp30.mode = 'observed'
+            AND mp30.as_of = (SELECT MAX(as_of) FROM market_pressure
+                               WHERE card_id = c.id AND window_days = 30 AND mode = 'observed')
+        LEFT JOIN market_pressure mp7
+            ON mp7.card_id = c.id AND mp7.window_days = 7 AND mp7.mode = 'observed'
+            AND mp7.as_of = (SELECT MAX(as_of) FROM market_pressure
+                              WHERE card_id = c.id AND window_days = 7 AND mode = 'observed')
+        LEFT JOIN supply_saturation ss
+            ON ss.card_id = c.id AND ss.mode = 'observed'
+            AND ss.as_of = (SELECT MAX(as_of) FROM supply_saturation
+                             WHERE card_id = c.id AND ss.mode = 'observed')
+        WHERE c.sealed_product = 'N'
+    """).fetchall()
+
+    features_list = []
+    for r in rows:
+        psa10 = r["psa_10_price"]
+        if not psa10 or psa10 < MIN_PSA10_PRICE:
+            continue
+
+        p30 = r["psa10_30d_ago"]
+        p90 = r["psa10_90d_ago"]
+        p365 = r["psa10_365d_ago"]
+        max_1y = r["psa10_max_1y"] or psa10
+        min_1y = r["psa10_min_1y"] or psa10
+
+        ret_30d = (psa10 / p30 - 1) if p30 and p30 > 0 else 0.0
+        ret_90d = (psa10 / p90 - 1) if p90 and p90 > 0 else 0.0
+        ret_365d = (psa10 / p365 - 1) if p365 and p365 > 0 else 0.0
+
+        peak_disc = max(0, (max_1y - psa10) / max_1y) if max_1y > 0 else 0.0
+        trough_rec = max(0, (psa10 - min_1y) / min_1y) if min_1y > 0 else 0.0
+        vol = max(0, (max_1y - min_1y) / psa10) if psa10 > 0 else 0.0
+
+        anchors = [p for p in [p30, p90, p365] if p and p > 0]
+        ma = np.mean(anchors) if anchors else psa10
+        ma_dist = (ma - psa10) / ma if ma > 0 else 0.0
+
+        sp = r["sp_30d"]
+        dp = r["dp_30d"]
+        ds = dp / sp if sp and sp > 0 else 1.0
+
+        cult = cultural_score(r["product_name"], r["rarity_code"])
+
+        features_list.append({
+            "card_id": r["id"],
+            "ret_30d": ret_30d,
+            "ret_90d": ret_90d,
+            "ret_365d": ret_365d,
+            "peak_discount": peak_disc,
+            "trough_recovery": trough_rec,
+            "volatility": vol,
+            "ma_distance": ma_dist,
+            "log_price": math.log10(max(psa10, 1.0)),
+            "net_flow_pct_7d": r["nf_7d"] or 0.0,
+            "net_flow_pct_30d": r["nf_30d"] or 0.0,
+            "demand_pressure_7d": r["dp_7d"] or 0.0,
+            "demand_pressure_30d": dp or 0.0,
+            "supply_saturation_index": r["supply_saturation_index"] or 1.0,
+            "ds_ratio": ds,
+            "gem_pct": r["gem_pct"] or 0.10,
+            "psa_10_pop": float(r["psa_10_base"] or 0),
+            "psa_10_vs_raw_pct": r["psa_10_vs_raw_pct"] or 0.0,
+            "cultural_score": cult,
+            "rarity_tier": 0.0,
+            "history_days": float(r["history_days"] or 0),
+        })
+
+    df = pd.DataFrame(features_list)
+    if not df.empty:
+        df = df.set_index("card_id")
+    logger.info("Built live features for %d cards", len(df))
+    return df
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _price_at_offset(
+    trailing: pd.DataFrame, anchor: pd.Timestamp, days: int
+) -> Optional[float]:
+    target = anchor - pd.Timedelta(days=days)
+    before = trailing[trailing.index <= target]["psa_10_price"]
+    if before.empty:
+        return None
+    return float(before.iloc[-1])
+
+
+def _get_mp_feature(
+    mp: pd.DataFrame, window: int, col: str
+) -> Optional[float]:
+    subset = mp[mp["window_days"] == window]
+    if subset.empty:
+        return None
+    return float(subset.iloc[-1][col]) if pd.notna(subset.iloc[-1][col]) else None
+
+
+def _get_ss_feature(ss: pd.DataFrame) -> Optional[float]:
+    if ss.empty:
+        return None
+    val = ss.iloc[-1]["supply_saturation_index"]
+    return float(val) if pd.notna(val) else None
+
+
+def _get_latest_psa(
+    psa: pd.DataFrame, anchor: pd.Timestamp, col: str
+) -> Optional[float]:
+    before = psa[psa.index <= anchor]
+    if before.empty:
+        return None
+    val = before.iloc[-1][col]
+    return float(val) if pd.notna(val) else None

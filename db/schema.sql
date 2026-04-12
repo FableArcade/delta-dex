@@ -276,6 +276,39 @@ CREATE TABLE IF NOT EXISTS pipeline_runs (
 );
 
 -- ============================================================
+-- Model prediction tables (PokeDelta)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS model_projections (
+    card_id         TEXT NOT NULL REFERENCES cards(id),
+    as_of           TEXT NOT NULL,
+    horizon_days    INTEGER NOT NULL,
+    projected_return REAL,
+    confidence_low  REAL,
+    confidence_high REAL,
+    confidence_width REAL,
+    feature_contributions TEXT,
+    model_version   TEXT,
+    PRIMARY KEY (card_id, as_of, horizon_days)
+);
+
+CREATE TABLE IF NOT EXISTS model_report_card (
+    model_version       TEXT NOT NULL,
+    as_of               TEXT NOT NULL,
+    horizon_days        INTEGER NOT NULL,
+    total_samples       INTEGER,
+    r_squared_oos       REAL,
+    spearman_oos        REAL,
+    mean_return_top_decile    REAL,
+    mean_return_bottom_decile REAL,
+    decile_spread       REAL,
+    hit_rate_positive   REAL,
+    calibration_json    TEXT,
+    feature_importance_json TEXT,
+    PRIMARY KEY (model_version, as_of, horizon_days)
+);
+
+-- ============================================================
 -- Indexes
 -- ============================================================
 
@@ -287,3 +320,5 @@ CREATE INDEX IF NOT EXISTS idx_ebay_history_date ON ebay_history(date);
 CREATE INDEX IF NOT EXISTS idx_composite_date ON composite_history(date);
 CREATE INDEX IF NOT EXISTS idx_set_daily_date ON set_daily(date);
 CREATE INDEX IF NOT EXISTS idx_leaderboard_date ON leaderboard(date);
+CREATE INDEX IF NOT EXISTS idx_model_projections_asof ON model_projections(as_of);
+CREATE INDEX IF NOT EXISTS idx_model_projections_card ON model_projections(card_id, horizon_days);

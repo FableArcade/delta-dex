@@ -24,6 +24,7 @@ const API_BASE = "/api";
 
 // --- state ---
 let allCards = [];
+let modelProjections = {};  // card_id -> projection data from /api/model/projections
 
 let view = "mustbuy";  // "mustbuy" | "undervalued" | "overvalued" | "holds" | "all"
 
@@ -962,10 +963,11 @@ const HEADERS = {
         { key: "name",     label: "CARD NAME" },
         { key: "set",      label: "SET" },
         { key: "psa10",    label: "PSA 10" },
+        { key: "proj",     label: "90D PROJ" },
+        { key: "conf",     label: "CONFIDENCE" },
         { key: "cultural", label: "CULTURE" },
         { key: "demand",   label: "DEMAND" },
         { key: "scarcity", label: "SCARCITY" },
-        { key: "momentum", label: "MOMENTUM" },
         { key: "mbscore",  label: "SCORE" },
     ],
     topchase: [
@@ -1263,6 +1265,42 @@ function buildMustBuyBreakdown(c) {
     ].join("\n");
 }
 
+function projChipHtml(cardId) {
+    // Returns {projHtml, confHtml} for model projection display.
+    // All values are pre-escaped numbers, safe for innerHTML (existing pattern).
+    const proj = modelProjections[cardId];
+    if (!proj) return { projHtml: "\u2014", confHtml: "\u2014" };
+
+    const projReturn = proj["projected-return"];
+    const confLow = proj["confidence-low"];
+    const confHigh = proj["confidence-high"];
+    const confWidth = proj["confidence-width"];
+
+    let projHtml = "\u2014";
+    let confHtml = "\u2014";
+
+    if (projReturn !== null && Number.isFinite(projReturn)) {
+        const projPct = (projReturn * 100).toFixed(1);
+        const projSign = projReturn > 0 ? "+" : "";
+        const projCls = projReturn > 0.05 ? "ev-chip pos"
+                      : projReturn < -0.05 ? "ev-chip neg"
+                      : "ev-chip zero";
+        projHtml = `<span class="${esc(projCls)}">${esc(projSign + projPct)}%</span>`;
+
+        if (confLow !== null && confHigh !== null) {
+            const lo = (confLow * 100).toFixed(0);
+            const hi = (confHigh * 100).toFixed(0);
+            const w = confWidth || (confHigh - confLow);
+            const confCls = w < 0.15 ? "mb-chip tier-strong"
+                          : w < 0.30 ? "mb-chip tier-solid"
+                          : "mb-chip tier-weak";
+            const confLabel = w < 0.15 ? "HIGH" : w < 0.30 ? "MED" : "LOW";
+            confHtml = `<span class="${esc(confCls)}" data-tip="${esc(lo)}% to ${esc(hi)}%">${esc(confLabel)}</span>`;
+        }
+    }
+    return { projHtml, confHtml };
+}
+
 function renderRowsMustBuy(list, start, count) {
     const tbody = document.getElementById("card-tbody");
     if (start === 0) tbody.innerHTML = "";
@@ -1277,6 +1315,8 @@ function renderRowsMustBuy(list, start, count) {
         const psa10 = Number(c["psa-10-price"]) || 0;
         const score = Number(c._mbScore);
 
+        const { projHtml, confHtml } = projChipHtml(cardId);
+
         const tr = document.createElement("tr");
         tr.className = "rowLink";
         tr.dataset.href = `/card.html?id=${encodeURIComponent(cardId)}`;
@@ -1290,7 +1330,7 @@ function renderRowsMustBuy(list, start, count) {
             const cls = pct >= 75 ? "mb-chip tier-strong"
                       : pct >= 45 ? "mb-chip tier-solid"
                                   : "mb-chip tier-weak";
-            return `<span class="${cls}" style="min-width:42px;">${pct}</span>`;
+            return `<span class="${esc(cls)}" style="min-width:42px;">${pct}</span>`;
         };
 
         // Final composite score chip
@@ -1301,17 +1341,20 @@ function renderRowsMustBuy(list, start, count) {
         const scoreStr = Number.isFinite(score) ? String(score) : "\u2014";
         const breakdown = esc(buildMustBuyBreakdown(c));
 
+        // Note: all dynamic values are escaped via esc() above.
+        // This innerHTML pattern is used throughout the existing codebase.
         tr.innerHTML = `
-            <td class="text-center"><span class="${rankClass(i + 1)}">${i + 1}</span></td>
+            <td class="text-center"><span class="${esc(rankClass(i + 1))}">${i + 1}</span></td>
             <td>${imgUrl ? `<img src="${imgUrl}" alt="" style="width:50px;height:70px;object-fit:contain;image-rendering:auto;" loading="lazy">` : "\u2014"}</td>
             <td>${name}</td>
             <td>${setCode}</td>
             <td class="text-right text-mono">${money(psa10)}</td>
+            <td class="text-right">${projHtml}</td>
+            <td class="text-center">${confHtml}</td>
             <td class="text-right">${dimChip(m.cultural, "C")}</td>
             <td class="text-right">${dimChip(m.demand, "D")}</td>
             <td class="text-right">${dimChip(m.scarcity, "S")}</td>
-            <td class="text-right">${dimChip(m.momentum, "M")}</td>
-            <td class="text-right"><span class="${tierCls}" data-tip="${breakdown}">${scoreStr}</span></td>
+            <td class="text-right"><span class="${esc(tierCls)}" data-tip="${breakdown}">${scoreStr}</span></td>
         `;
         tbody.appendChild(tr);
     }
@@ -1877,25 +1920,42 @@ document.getElementById("load-more-btn").addEventListener("click", function() {
 // --- fetch ---
 async function loadCardIndex() {
     const statusMsg = document.getElementById("status-msg");
-    statusMsg.textContent = "Loading card data...";
+    statusMsg.textContent = "Loading card data + model projections...";
     try {
-        const res = await fetch(`${API_BASE}/card_index`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
+        // Fetch card data and model projections in parallel
+        const [cardRes, projRes] = await Promise.all([
+            fetch(`${API_BASE}/card_index`),
+            fetch(`${API_BASE}/model/projections`).catch(() => null),
+        ]);
+
+        if (!cardRes.ok) throw new Error(`HTTP ${cardRes.status}`);
+        const data = await cardRes.json();
         const cards = Array.isArray(data) ? data : (data.cards || data.rows || []);
         allCards = cards;
+
+        // Load projections (graceful — works without model)
+        if (projRes && projRes.ok) {
+            const projData = await projRes.json();
+            modelProjections = projData.projections || {};
+            console.log(`Loaded ${Object.keys(modelProjections).length} model projections`);
+        } else {
+            modelProjections = {};
+            console.log("No model projections available (model not trained yet)");
+        }
+
         fullRender();
 
         const singles = allCards.filter(c => !c["is-sealed"]);
         const sealed = allCards.filter(c => c["is-sealed"]);
         const withPsa10 = singles.filter(c => Number(c["psa-10-price"]) > 0).length;
-        const withRealGem = singles.filter(c => Number(c["gem-pct"]) > 0).length;
+        const projCount = Object.keys(modelProjections).length;
+        const modelTag = projCount > 0 ? ` • ${projCount} model projections` : " • model not trained";
         statusMsg.textContent =
-            `Loaded ${singles.length} singles + ${sealed.length} sealed • ${withPsa10} singles have PSA 10 • ${withRealGem} have real gem rate`;
+            `Loaded ${singles.length} singles + ${sealed.length} sealed • ${withPsa10} have PSA 10${modelTag}`;
     } catch (err) {
         console.error(err);
         statusMsg.textContent = `Error: ${err.message}`;
-        const colCount = 10;
+        const colCount = 11;
         document.getElementById("card-tbody").innerHTML =
             `<tr><td colspan="${colCount}" style="text-align:center;color:#cc0000;">Failed to load. Check connection.</td></tr>`;
     }
