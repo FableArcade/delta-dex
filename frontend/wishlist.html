@@ -201,16 +201,20 @@
             <div class="hero-text">
                 <div class="hero-title">your prioritized buy list</div>
                 <div class="hero-subtitle">
-                    Star cards from any card detail page. This view ranks them by fit score given
-                    your <strong>budget</strong> + <strong>holding horizon</strong>, so you know
-                    which one to buy <em>first</em> instead of spreading thin. Scoring blends
-                    all five Must Buy dimensions, the Long-Term Hold formula, 30d price
-                    trajectory, and a budget-fit bonus.
+                    Star cards from any card detail page. Choose your ranking mode:
+                    <strong>Budget Fit</strong> picks what to buy <em>first</em> given your money,
+                    <strong>Pure ROI</strong> ranks by pure investment potential regardless of price.
                 </div>
             </div>
         </div>
 
-        <div class="opp-philosophy" style="margin:8px 12px 0;">Value screen: mean-reversion model — ranks cards that have fallen from peak with cultural staying power to recover. Opposite of the Long-Term Holds momentum screen.</div>
+        <!-- Mode tabs -->
+        <div style="display:flex;gap:2px;padding:8px 12px 0;background:var(--win-surface);">
+            <button class="wl-mode-tab active" data-mode="fit" style="height:28px;padding:0 16px;background:#dfdfdf;box-shadow:var(--bevel-sunken);border:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:bold;color:#003388;">&#128176; Budget Fit</button>
+            <button class="wl-mode-tab" data-mode="roi" style="height:28px;padding:0 16px;background:var(--win-surface);box-shadow:var(--bevel-raised);border:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:bold;">&#128200; Pure ROI</button>
+        </div>
+
+        <div class="opp-philosophy" id="wl-mode-description" style="margin:8px 12px 0;">Budget Fit: ranks by best investment that fits your budget + horizon. Uses mean-reversion model + budget-fit bonus.</div>
 
         <!-- Toolbar: Budget + Horizon inputs -->
         <div class="wl-toolbar">
@@ -245,7 +249,7 @@
             <div class="win-table-wrap">
                 <div class="table-scroll" style="max-height: 70vh;">
                     <table class="wl-table" id="wl-table">
-                        <thead>
+                        <thead id="wl-thead">
                             <tr>
                                 <th style="width:40px;">#</th>
                                 <th style="width:70px;">Image</th>
