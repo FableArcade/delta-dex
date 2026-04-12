@@ -681,58 +681,95 @@ function filterBestGrading() {
 }
 
 function filterDemandSurge() {
+    const hasProj = Object.keys(modelProjections).length > 0;
     const out = [];
     for (const c of allCards) {
         if (c["is-sealed"]) continue;
         const psa10 = Number(c["psa-10-price"]);
         if (!Number.isFinite(psa10) || psa10 < dsMinPsa10) continue;
 
-        // Normalized net flow — scale-invariant, so a thin $1000 card with
-        // a real surge isn't drowned out by a noisy high-volume common.
         const nfPct = Number(c["net-flow-pct"]);
         if (!Number.isFinite(nfPct) || nfPct < dsMinNfPct) continue;
 
-        // Supply saturation gate: a card whose listings are FLOODED (sat ≥ 1)
-        // can't be in a real surge — the demand isn't absorbing supply faster
-        // than it's being listed. A "surge" requires tightness.
         const satIdx = Number(c["supply-saturation-index"]);
         if (Number.isFinite(satIdx) && satIdx >= 1) continue;
 
-        // Demand/supply ratio gate: must have MORE absorption than inflow.
-        // This is the cleanest normalized read on "demand beating supply".
-        // REQUIRE both present — a card missing dem/sup silently passed the
-        // gate before, which let noise through. If we can't compute the
-        // ratio we can't claim a surge, so reject.
         const dem = Number(c["demand-pressure"]);
         const sup = Number(c["supply-pressure"]);
         if (!Number.isFinite(dem) || !Number.isFinite(sup) || sup <= 0) continue;
-        if (dem / sup < 1.2) continue;  // require ≥20% more buyers than sellers
+        if (dem / sup < 1.2) continue;
 
+        // Attach projection data
+        if (hasProj) {
+            const proj = modelProjections[c.id];
+            c._projReturn = proj ? proj["projected-return"] : null;
+        }
         out.push(c);
     }
     return out;
 }
 
 function filterMustBuy() {
+    const hasProjections = Object.keys(modelProjections).length > 0;
     const out = [];
     for (const c of allCards) {
         if (!Number.isFinite(c._mbScore)) continue;
         if (c._mbScore < mustBuyMinScore) continue;
+
+        // When model projections are available, boost ranking:
+        // attach projection data to card for sorting
+        if (hasProjections) {
+            const proj = modelProjections[c.id];
+            if (proj) {
+                c._projReturn = proj["projected-return"];
+                c._confLow = proj["confidence-low"];
+                c._confHigh = proj["confidence-high"];
+                c._confWidth = proj["confidence-width"];
+            } else {
+                c._projReturn = null;
+                c._confLow = null;
+                c._confHigh = null;
+                c._confWidth = null;
+            }
+        }
         out.push(c);
     }
+
+    // When model available, re-sort by projected return (model-driven ranking)
+    // Cards with positive confidence_low (even pessimistic case is profitable) go first
+    if (hasProjections) {
+        out.sort((a, b) => {
+            const aProj = Number.isFinite(a._projReturn) ? a._projReturn : -Infinity;
+            const bProj = Number.isFinite(b._projReturn) ? b._projReturn : -Infinity;
+            // Primary: cards where confidence_low > 0 (high conviction) first
+            const aConv = (a._confLow != null && a._confLow > 0) ? 1 : 0;
+            const bConv = (b._confLow != null && b._confLow > 0) ? 1 : 0;
+            if (aConv !== bConv) return bConv - aConv;
+            // Secondary: sort by projected return descending
+            return bProj - aProj;
+        });
+    }
+
     return out;
 }
 
 function filterTopChase() {
+    const hasProj = Object.keys(modelProjections).length > 0;
     const out = [];
     for (const c of allCards) {
         if (c["is-sealed"]) continue;
         const psa10 = Number(c["psa-10-price"]);
         if (!Number.isFinite(psa10) || psa10 < chaseMinPsa10) continue;
-        // Demand floor on NORMALIZED net flow — scale-invariant, so thinly-
-        // traded grails aren't penalized vs high-volume cards.
         const nfPct = Number(c["net-flow-pct-30d"]);
         if (Number.isFinite(nfPct) && nfPct < chaseMinDemand) continue;
+        // Attach projection data
+        if (hasProj) {
+            const proj = modelProjections[c.id];
+            c._projReturn = proj ? proj["projected-return"] : null;
+            c._confLow = proj ? proj["confidence-low"] : null;
+            c._confHigh = proj ? proj["confidence-high"] : null;
+            c._confWidth = proj ? proj["confidence-width"] : null;
+        }
         out.push(c);
     }
     return out;
@@ -861,7 +898,7 @@ function getSortValueDemandSurge(card, key) {
         case "name":     return (card["product-name"] || "").toLowerCase();
         case "set":      return (card["set-code"] || "").toLowerCase();
         case "psa10":    return Number(card["psa-10-price"]) || 0;
-        case "raw":      return Number(card["raw-price"]) || 0;
+        case "proj":     return Number.isFinite(card._projReturn) ? card._projReturn : -Infinity;
         case "demand":   return Number(card["demand-pressure"]) || 0;
         case "supply":   return Number(card["supply-pressure"]) || 0;
         case "ratio":    {
@@ -881,6 +918,8 @@ function getSortValueMustBuy(card, key) {
         case "name":     return (card["product-name"] || "").toLowerCase();
         case "set":      return (card["set-code"] || "").toLowerCase();
         case "psa10":    return Number(card["psa-10-price"]) || 0;
+        case "proj":     return Number.isFinite(card._projReturn) ? card._projReturn : -Infinity;
+        case "conf":     return card._confWidth != null ? -card._confWidth : Infinity; // tighter = higher
         case "cultural": return Number(m.cultural)     || 0;
         case "demand":   return Number(m.demand)       || 0;
         case "scarcity": return Number(m.scarcity)     || 0;
@@ -896,7 +935,7 @@ function getSortValueTopChase(card, key) {
         case "name":      return (card["product-name"] || "").toLowerCase();
         case "set":       return (card["set-code"] || "").toLowerCase();
         case "psa10":     return Number(card["psa-10-price"]) || 0;
-        case "raw":       return Number(card["raw-price"]) || 0;
+        case "proj":      return Number.isFinite(card._projReturn) ? card._projReturn : -Infinity;
         case "cultural":  return culturalImpactScore(card);
         case "nfpct":     return Number.isFinite(Number(card["net-flow-pct-30d"])) ? Number(card["net-flow-pct-30d"]) : -Infinity;
         case "chasescore":return Number(card._chaseScore) || 0;
@@ -976,7 +1015,7 @@ const HEADERS = {
         { key: "name",       label: "CARD NAME" },
         { key: "set",        label: "SET" },
         { key: "psa10",      label: "PSA 10" },
-        { key: "raw",        label: "RAW" },
+        { key: "proj",       label: "90D PROJ" },
         { key: "cultural",   label: "CULTURE" },
         { key: "nfpct",      label: "NET FLOW 30D %" },
         { key: "chasescore", label: "CHASE" },
@@ -987,7 +1026,7 @@ const HEADERS = {
         { key: "name",    label: "CARD NAME" },
         { key: "set",     label: "SET" },
         { key: "psa10",   label: "PSA 10" },
-        { key: "raw",     label: "RAW" },
+        { key: "proj",    label: "90D PROJ" },
         { key: "demand",  label: "DEMAND" },
         { key: "supply",  label: "SUPPLY" },
         { key: "ratio",   label: "D/S RATIO" },
@@ -1103,11 +1142,11 @@ function renderRowsDemandSurge(list, start, count) {
         const setCode = esc(c["set-code"] || "");
         const name    = esc(c["product-name"] || "\u2014");
         const psa10Price = Number(c["psa-10-price"]) || 0;
-        const rawPrice = Number(c["raw-price"]) || 0;
         const demand = Number(c["demand-pressure"]);
         const supply = Number(c["supply-pressure"]);
         const ratio = (Number.isFinite(demand) && Number.isFinite(supply) && supply > 0) ? demand / supply : null;
         const nfPct = Number(c["net-flow-pct"]);
+        const { projHtml: dsProjHtml } = projChipHtml(cardId);
 
         const tr = document.createElement("tr");
         tr.className = "rowLink";
@@ -1130,17 +1169,18 @@ function renderRowsDemandSurge(list, start, count) {
             (Number.isFinite(ratio) && ratio >= 2) ? "mb-chip tier-solid"  :
                                                      "mb-chip tier-weak";
 
+        // Note: all values are escaped or numeric. innerHTML pattern matches existing codebase.
         tr.innerHTML = `
-            <td class="text-center"><span class="${rankClass(i + 1)}">${i + 1}</span></td>
+            <td class="text-center"><span class="${esc(rankClass(i + 1))}">${i + 1}</span></td>
             <td>${imgUrl ? `<img src="${imgUrl}" alt="" style="width:50px;height:70px;object-fit:contain;image-rendering:auto;" loading="lazy">` : "\u2014"}</td>
             <td>${name}</td>
             <td>${setCode}</td>
             <td class="text-right text-mono">${money(psa10Price)}</td>
-            <td class="text-right text-mono">${money(rawPrice)}</td>
+            <td class="text-right">${dsProjHtml}</td>
             <td class="text-right text-mono">${demandStr}</td>
             <td class="text-right text-mono">${supplyStr}</td>
-            <td class="text-right"><span class="${ratioCls}">${ratioStr}</span></td>
-            <td class="text-right"><span class="${nfCls}">${nfPctStr}</span></td>
+            <td class="text-right"><span class="${esc(ratioCls)}">${ratioStr}</span></td>
+            <td class="text-right"><span class="${esc(nfCls)}">${nfPctStr}</span></td>
         `;
         tbody.appendChild(tr);
     }
@@ -1166,10 +1206,10 @@ function renderRowsTopChase(list, start, count) {
         const setCode = esc(c["set-code"] || "");
         const name    = esc(c["product-name"] || "\u2014");
         const psa10 = Number(c["psa-10-price"]) || 0;
-        const raw   = Number(c["raw-price"])    || 0;
         const cultural = culturalImpactScore(c);
         const nfPct = Number(c["net-flow-pct-30d"]);
         const score = Number(c._chaseScore);
+        const { projHtml: tcProjHtml } = projChipHtml(cardId);
 
         const tr = document.createElement("tr");
         tr.className = "rowLink";
@@ -1189,25 +1229,23 @@ function renderRowsTopChase(list, start, count) {
         const nfCls = Number.isFinite(nfPct) && nfPct > 0.05 ? "chip chip-pos" :
                      Number.isFinite(nfPct) && nfPct > 0     ? "chip chip-neu" :
                                                                "chip chip-neg";
-        // Score thresholds retuned for new formula: sqrt(psa10/100) × demand × cultural.
-        // A $400 mid-tier card with neutral demand + cultural 0.5 → 2 × 1 × 1.4 = 2.8.
-        // A $2000 iconic with strong demand → 4.5 × 1.5 × 1.8 ≈ 12.
         const tierCls =
             Number.isFinite(score) && score >= 8 ? "mb-chip tier-strong" :
             Number.isFinite(score) && score >= 4 ? "mb-chip tier-solid"  :
                                                     "mb-chip tier-weak";
         const scoreStr = Number.isFinite(score) ? score.toFixed(2) : "\u2014";
 
+        // Note: all values are escaped or numeric. innerHTML pattern matches existing codebase.
         tr.innerHTML = `
-            <td class="text-center"><span class="${rankClass(i + 1)}">${i + 1}</span></td>
+            <td class="text-center"><span class="${esc(rankClass(i + 1))}">${i + 1}</span></td>
             <td>${imgUrl ? `<img src="${imgUrl}" alt="" style="width:50px;height:70px;object-fit:contain;image-rendering:auto;" loading="lazy">` : "\u2014"}</td>
             <td>${name}</td>
             <td>${setCode}</td>
             <td class="text-right text-mono">${money(psa10)}</td>
-            <td class="text-right text-mono">${money(raw)}</td>
-            <td class="text-right"><span class="${culturalCls}">${culturalStr}</span></td>
-            <td class="text-right"><span class="${nfCls}">${nfStr}</span></td>
-            <td class="text-right"><span class="${tierCls}">${scoreStr}</span></td>
+            <td class="text-right">${tcProjHtml}</td>
+            <td class="text-right"><span class="${esc(culturalCls)}">${culturalStr}</span></td>
+            <td class="text-right"><span class="${esc(nfCls)}">${nfStr}</span></td>
+            <td class="text-right"><span class="${esc(tierCls)}">${scoreStr}</span></td>
         `;
         tbody.appendChild(tr);
     }
@@ -1808,7 +1846,9 @@ function wireToolbar() {
 
             // Reset sort to view's sensible default
             if (view === "holds")             currentSort = { key: "score",      dir: "desc" };
-            else if (view === "mustbuy")      currentSort = { key: "mbscore",    dir: "desc" };
+            else if (view === "mustbuy")      currentSort = Object.keys(modelProjections).length > 0
+                                                             ? { key: "proj", dir: "desc" }
+                                                             : { key: "mbscore", dir: "desc" };
             else if (view === "topchase")     currentSort = { key: "chasescore", dir: "desc" };
             else if (view === "demandsurge")  currentSort = { key: "ratio",      dir: "desc" };
             else if (view === "bestgrading")  currentSort = { key: "ev",         dir: "desc" };
