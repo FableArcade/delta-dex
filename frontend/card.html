@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>POKEMETRICS.EXE - Card Detail</title>
+    <link rel="stylesheet" href="css/win98.css">
+    <link rel="stylesheet" href="css/retro-screen.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* === Card Detail Page Styles === */
+
+        .card-header-grid {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 16px;
+            align-items: start;
+        }
+        @media (max-width: 768px) {
+            .card-header-grid { grid-template-columns: 1fr; }
+        }
+
+        .card-image-frame {
+            box-shadow: var(--bevel-sunken);
+            background: var(--win-white);
+            padding: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .card-image-frame img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            image-rendering: auto;
+        }
+
+        .card-info-name {
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+        .card-info-set {
+            font-size: 13px;
+            color: var(--win-text-disabled);
+            margin-bottom: 8px;
+        }
+        .card-info-set a {
+            color: var(--win-link);
+            text-decoration: underline;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 8px;
+        }
+
+        .stat-box {
+            border: 2px groove var(--win-surface);
+            padding: 8px;
+            position: relative;
+            margin-top: 8px;
+        }
+        .stat-box-label {
+            position: absolute;
+            top: -8px;
+            left: 8px;
+            background: var(--win-surface);
+            padding: 0 4px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .stat-box-value {
+            font-size: 20px;
+            font-weight: bold;
+            font-variant-numeric: tabular-nums;
+        }
+        .stat-box-value.small {
+            font-size: 15px;
+        }
+
+        /* Time interval buttons */
+        .interval-bar {
+            display: flex;
+            gap: 2px;
+            margin-bottom: 6px;
+        }
+        .interval-btn {
+            height: 20px;
+            padding: 0 10px;
+            background: var(--win-surface);
+            box-shadow: var(--bevel-raised);
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .interval-btn:active,
+        .interval-btn.active {
+            box-shadow: var(--bevel-sunken);
+            background: #dfdfdf;
+        }
+
+        /* Chart containers */
+        .chart-wrap {
+            position: relative;
+            height: 320px;
+        }
+        .chart-wrap canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+        .chart-wrap-sm {
+            height: 220px;
+        }
+
+        /* CRT legend row */
+        .crt-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 6px 8px 2px;
+            font-size: 11px;
+            color: #33ff33;
+            font-family: 'W95FA', 'Courier New', monospace;
+        }
+        .crt-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .crt-legend-swatch {
+            width: 14px;
+            height: 3px;
+            display: inline-block;
+        }
+        .crt-legend-swatch.dotted {
+            border-top: 2px dotted;
+            background: none !important;
+            height: 0;
+        }
+
+        /* Gauge / progress tweaks */
+        .gauge-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        .gauge-label {
+            font-size: 11px;
+            font-weight: bold;
+            width: 120px;
+            flex-shrink: 0;
+            text-transform: uppercase;
+        }
+        .gauge-value {
+            font-size: 11px;
+            font-variant-numeric: tabular-nums;
+            width: 50px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+        .gauge-bar-wrap {
+            flex: 1;
+        }
+        .progress-bar-green {
+            height: 100%;
+            background: repeating-linear-gradient(90deg, #008000 0px, #008000 8px, transparent 8px, transparent 10px);
+        }
+        .progress-bar-red {
+            height: 100%;
+            background: repeating-linear-gradient(90deg, #cc0000 0px, #cc0000 8px, transparent 8px, transparent 10px);
+        }
+        .progress-bar-yellow {
+            height: 100%;
+            background: repeating-linear-gradient(90deg, #c0a000 0px, #c0a000 8px, transparent 8px, transparent 10px);
+        }
+
+        /* State chips */
+        .state-chip {
+            display: inline-block;
+            padding: 2px 8px;
+            font-size: 11px;
+            font-weight: bold;
+            border: 1px solid;
+            text-transform: uppercase;
+        }
+        /* Sentiment chips — semantic naming. The pipeline labels supply STATE
+           ("accumulating" = listings piling up = bearish, "draining" = listings
+           being absorbed = bullish), but the user-facing chip should say what
+           it MEANS, not what the supply is doing. We use bullish/bearish/
+           balanced classes that map directly to the visual semantic. */
+        .state-bullish     { color: #008000; background: #c8ffc8; border-color: #008000; }
+        .state-bearish     { color: #cc0000; background: #ffc8c8; border-color: #cc0000; }
+        .state-balanced    { color: #444;    background: #e8e8e8; border-color: #808080; }
+        /* Legacy classes — kept so any non-card.js consumer doesn't break */
+        .state-accumulating { color: #cc0000; background: #ffc8c8; border-color: #cc0000; }
+        .state-draining     { color: #008000; background: #c8ffc8; border-color: #008000; }
+
+        /* Saturation bar */
+        .sat-bar-track {
+            box-shadow: var(--bevel-sunken);
+            height: 22px;
+            padding: 2px;
+            background: var(--win-surface);
+            position: relative;
+        }
+        .sat-bar-fill {
+            height: 100%;
+            transition: width 0.3s;
+        }
+        .sat-bar-marker {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--win-black);
+            z-index: 2;
+        }
+        .sat-bar-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: var(--win-text-disabled);
+            margin-top: 2px;
+        }
+
+        /* Key metrics grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 8px;
+        }
+
+        /* Price source table */
+        .source-table td, .source-table th {
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+
+        /* Rarity badge */
+        .rarity-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            font-size: 11px;
+            font-weight: bold;
+            box-shadow: var(--bevel-raised);
+            background: var(--win-surface);
+        }
+
+        /* ============================================================
+           Metric tooltips — hover any element with [data-tooltip] to get
+           a Win98-styled layman explanation of what that metric means
+           for an investor.
+           ============================================================ */
+        [data-tooltip] {
+            position: relative;
+            cursor: help;
+            border-bottom: 1px dotted #606060;
+        }
+        [data-tooltip]::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 0;
+            bottom: calc(100% + 6px);
+            width: 260px;
+            padding: 6px 8px;
+            font-size: 11px;
+            font-weight: normal;
+            font-family: 'Tahoma', 'MS Sans Serif', sans-serif;
+            text-transform: none;
+            line-height: 1.35;
+            text-align: left;
+            color: #000;
+            background: #ffffe1;  /* classic Win98 tooltip yellow */
+            border: 1px solid #000;
+            box-shadow: 2px 2px 0 rgba(0,0,0,0.25);
+            white-space: normal;
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(4px);
+            transition: opacity 0.08s ease-out, transform 0.08s ease-out;
+            z-index: 1000;
+        }
+        [data-tooltip]:hover::after,
+        [data-tooltip]:focus::after {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        /* If the label sits near the right edge, flip the tooltip so it
+           grows to the left. Use .tip-right class as a manual override. */
+        [data-tooltip].tip-right::after {
+            left: auto;
+            right: 0;
+        }
+        /* Drop the dotted underline on chip/badge-shaped labels where it
+           looks noisy, but keep the hover tooltip working. */
+        .state-chip[data-tooltip],
+        .rarity-badge[data-tooltip] {
+            border-bottom: none;
+        }
+        /* Wishlist button — retro toggle with a star glyph.
+           Default state: hollow star on grey bevel.
+           Added state:   solid star on bright gold, bolder text. */
+        .wishlist-btn {
+            font-family: Tahoma, sans-serif;
+            font-size: 12px;
+            padding: 6px 14px;
+            cursor: pointer;
+            background: var(--win-surface);
+            border: 2px outset var(--win-surface);
+            color: #000;
+            font-weight: bold;
+            transition: transform 120ms ease-out;
+        }
+        .wishlist-btn:hover { background: #e8e8f0; }
+        .wishlist-btn:active {
+            border-style: inset;
+            transform: scale(0.96);
+        }
+        .wishlist-btn.added {
+            background: #ffd850;
+            border-color: #a06000;
+            color: #402000;
+        }
+        .wishlist-btn.added:hover { background: #ffe880; }
+        /* Click-pop animation: applied briefly by JS to either state so the
+           click feels punchy even when the before/after colors are similar. */
+        .wishlist-btn.pop {
+            animation: wishlist-pop 320ms ease-out;
+        }
+        @keyframes wishlist-pop {
+            0%   { transform: scale(1); }
+            30%  { transform: scale(1.15); }
+            60%  { transform: scale(0.96); }
+            100% { transform: scale(1); }
+        }
+
+        /* Toast: slides down from the top when the wishlist state changes.
+           Auto-dismisses after a short delay. Fixed position so it overlays
+           whatever's underneath. */
+        .wishlist-toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-80px);
+            padding: 12px 24px;
+            background: #ffd850;
+            border: 3px outset #a06000;
+            color: #402000;
+            font-family: Tahoma, sans-serif;
+            font-size: 14px;
+            font-weight: bold;
+            box-shadow: 4px 4px 0 rgba(0,0,0,0.35);
+            z-index: 9999;
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 220ms ease-out, opacity 220ms ease-out;
+        }
+        .wishlist-toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+        .wishlist-toast.removed {
+            background: #e0e0e0;
+            border-color: #606060;
+            color: #202020;
+        }
+    </style>
+</head>
+<body>
+
+<div class="desktop">
+
+    <!-- ============================================================ -->
+    <!-- MAIN WINDOW -->
+    <!-- ============================================================ -->
+    <div class="window" style="max-width: 1400px; margin: 0 auto;">
+
+        <!-- Title bar -->
+        <div class="window-title">
+            <span class="window-title-text" id="window-title">POKEMETRICS.EXE - Card Detail</span>
+            <div class="window-controls">
+                <button class="window-btn">_</button>
+                <button class="window-btn">&square;</button>
+                <button class="window-btn">X</button>
+            </div>
+        </div>
+
+        <!-- Menu bar -->
+        <div class="menubar">
+            <a href="/" class="menu-item">Leaderboard</a>
+            <a href="/card_leaderboard.html" class="menu-item">Cards</a>
+            <a href="/sealed_leaderboard.html" class="menu-item">Sealed</a>
+            <a href="/sets.html" class="menu-item">Sets</a>
+            <a href="/wishlist.html" class="menu-item">Wishlist</a>
+            <a href="/search.html" class="menu-item">Search</a>
+            <a href="/calculator.html" class="menu-item">Calculator</a>
+            <a href="/about.html" class="menu-item">Help</a>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- A) CARD HEADER -->
+        <!-- ============================================================ -->
+        <div class="window-body" id="card-header" style="border-bottom: 2px groove var(--win-surface);">
+            <div class="card-header-grid">
+                <!-- LEFT: Card Image -->
+                <div class="card-image-frame" id="card-image-frame">
+                    <div style="text-align:center;color:#808080;padding:40px 0;">Loading card...</div>
+                </div>
+                <!-- RIGHT: Card Info -->
+                <div>
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+                        <div class="card-info-name" id="card-name" style="flex:1;">---</div>
+                        <button id="wishlist-btn" class="win-btn wishlist-btn" type="button"
+                                title="Add this card to your wishlist — the Wishlist page will rank your picks by budget + holding horizon."
+                                style="min-width:120px;white-space:nowrap;">
+                            <span id="wishlist-btn-icon">☆</span>
+                            <span id="wishlist-btn-label">Add to Wishlist</span>
+                        </button>
+                    </div>
+                    <div class="card-info-set" id="card-set-info">---</div>
+                    <div style="margin-bottom:8px;">
+                        <span class="rarity-badge" id="card-rarity">---</span>
+                        <span style="font-size:12px;margin-left:8px;" id="card-number">---</span>
+                    </div>
+                    <div class="stat-grid" id="stat-grid">
+                        <div class="stat-box">
+                            <div class="stat-box-label" data-tooltip="Current UNGRADED market price. This is your base cost before any grading fees.">Raw Price</div>
+                            <div class="stat-box-value" id="stat-raw">---</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-box-label" data-tooltip="Current market price for a PSA 10 (gem mint) copy. The ceiling for your grading upside.">PSA 10 Price</div>
+                            <div class="stat-box-value" id="stat-psa10">---</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-box-label" data-tooltip="Absolute dollar premium of PSA 10 over Raw. Your gross margin before grading fees (~$25 per card at bulk rates).">PSA 10 vs Raw $</div>
+                            <div class="stat-box-value small" id="stat-gain">---</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-box-label" data-tooltip="The PSA 10 premium as a percentage of raw. Above ~500% is usually a strong grading candidate once you factor in gem rate and fees.">PSA 10 vs Raw %</div>
+                            <div class="stat-box-value small" id="stat-gain-pct">---</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-box-label" data-tooltip="How often this card trades on PriceCharting's data. Higher = more liquid — easier to buy or exit a position quickly.">Sales Volume</div>
+                            <div class="stat-box-value small" id="stat-volume">---</div>
+                        </div>
+                    </div>
+                    <div class="stat-grid" id="scoring-factors" style="margin-top:4px;">
+                        <div class="stat-box">
+                            <div class="stat-box-label" data-tooltip="How far the PSA 10 price has fallen from its 12-month high. The wishlist scorer's strongest buy signal — larger discounts from peak = stronger mean-reversion opportunity.">Off 12mo Peak</div>
+                            <div class="stat-box-value small" id="stat-peak-disc">---</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-box-label" data-tooltip="Weighted price momentum across 30d (50%), 90d (30%), and 365d (20%) windows. The wishlist scorer uses the INVERSE — falling momentum = stronger buy signal (mean-reversion).">Momentum</div>
+                            <div class="stat-box-value small" id="stat-momentum">---</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-box-label" data-tooltip="Current PSA 10 price vs its moving average (blend of 30d/90d/365d anchors). Below the MA = oversold signal in the wishlist scorer.">vs Moving Avg</div>
+                            <div class="stat-box-value small" id="stat-ma-dist">---</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-box-label" data-tooltip="12-month price range relative to current price. Higher volatility = more mean-reversion opportunity in the wishlist scorer.">Volatility</div>
+                            <div class="stat-box-value small" id="stat-volatility">---</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- B) PRICE HISTORY CHART -->
+        <!-- ============================================================ -->
+        <div class="window-body">
+            <div class="window">
+                <div class="window-title" style="background: linear-gradient(90deg, #006400, #40a040);">
+                    <span class="window-title-text">C:\PRICE_HISTORY.DAT</span>
+                </div>
+                <div class="section-explainer">
+                    multi-source price history &mdash; raw, PSA graded, eBay derived, JustTCG, Collectrics
+                </div>
+                <div class="window-body">
+                    <div class="interval-bar" id="price-intervals">
+                        <button class="interval-btn" data-range="7">7D</button>
+                        <button class="interval-btn" data-range="30">30D</button>
+                        <button class="interval-btn" data-range="90">90D</button>
+                        <button class="interval-btn active" data-range="all">ALL</button>
+                    </div>
+                    <div class="crt-screen">
+                        <div class="crt-screen-inner">
+                            <div class="crt-legend" id="price-legend"></div>
+                            <div class="chart-wrap">
+                                <canvas id="chart-price"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="screen-label">DOT MATRIX WITH STEREO SOUND</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- C) MARKET DYNAMICS -->
+        <!-- ============================================================ -->
+        <div class="window-body">
+            <div class="window">
+                <div class="window-title" style="background: linear-gradient(90deg, #800000, #c04040);">
+                    <span class="window-title-icon">&#9888;</span>
+                    <span class="window-title-text">MARKET_DYNAMICS.EXE</span>
+                </div>
+                <div class="section-explainer">
+                    eBay listing data reveals supply/demand pressure, saturation levels, and market state
+                </div>
+                <div class="window-body">
+
+                    <!-- C1: Supply & Demand Pressure Gauges -->
+                    <div class="groupbox" style="margin-top:0;">
+                        <div class="groupbox-label" data-tooltip="Supply & Demand Pressure: a pair of 0–2 gauges measuring how many buyers vs sellers are in the market for this card, plus the Net Flow between them. Hover each row for details.">Supply &amp; Demand Pressure</div>
+                        <div id="pressure-gauges">
+                            <div style="color:#808080;text-align:center;padding:12px;">Loading market data...</div>
+                        </div>
+                    </div>
+
+                    <!-- C2: Supply Saturation Index -->
+                    <div class="groupbox">
+                        <div class="groupbox-label" data-tooltip="Supply Saturation Index: how flooded the listings are vs this card's historical baseline. LOWER IS BETTER for holders. Left (tight) = scarce, sellers have pricing power. Right (saturated) = flooded, expect price softness.">Supply Saturation Index</div>
+                        <div id="saturation-gauge">
+                            <div style="color:#808080;text-align:center;padding:12px;">---</div>
+                        </div>
+                    </div>
+
+                    <!-- C3: Listing Volume Chart -->
+                    <div class="groupbox">
+                        <div class="groupbox-label" data-tooltip="eBay Listing Volume: active vs ended listings over time, with demand pressure overlaid. Rising active + flat ended = market building inventory (bearish). Rising ended + flat active = market clearing (bullish).">eBay Listing Volume</div>
+                        <div class="interval-bar mt-4" id="listing-intervals">
+                            <button class="interval-btn" data-range="7">7D</button>
+                            <button class="interval-btn" data-range="30">30D</button>
+                            <button class="interval-btn" data-range="90">90D</button>
+                            <button class="interval-btn active" data-range="all">ALL</button>
+                        </div>
+                        <div class="crt-screen">
+                            <div class="crt-screen-inner">
+                                <div class="crt-legend" id="listing-legend"></div>
+                                <div class="chart-wrap chart-wrap-sm">
+                                    <canvas id="chart-listings"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- C4: Key Metrics Grid -->
+                    <div class="groupbox">
+                        <div class="groupbox-label" data-tooltip="Key Metrics: the raw numbers underneath the gauges — averages of active and ended listings, net flow, and estimated sold-through rate, for both the 7-day and 30-day windows.">Key Metrics</div>
+                        <div class="metrics-grid" id="key-metrics">
+                            <div style="color:#808080;text-align:center;padding:12px;grid-column:1/-1;">---</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- D) PSA POPULATION + E) PRICE SOURCES — side by side -->
+        <!-- ============================================================ -->
+        <div class="window-body">
+            <div class="grid-2">
+
+                <!-- D: PSA Population -->
+                <div class="window">
+                    <div class="window-title" style="background: linear-gradient(90deg, #8b6914, #c0a040);">
+                        <span class="window-title-text">C:\PSA_POPULATION.DAT</span>
+                    </div>
+                    <div class="window-body">
+                        <div class="stat-grid" id="psa-stats" style="margin-bottom:8px;">
+                            <div class="stat-box" style="margin-top:0;">
+                                <div class="stat-box-label" data-tooltip="Total copies graded PSA 10 by PSA (all-time population). LOWER population = rarer in top grade = higher PSA 10 premium. Supply-side scarcity signal.">PSA 10</div>
+                                <div class="stat-box-value small" id="psa-10-count">---</div>
+                            </div>
+                            <div class="stat-box" style="margin-top:0;">
+                                <div class="stat-box-label" data-tooltip="Total copies graded PSA 9 by PSA. Useful context for how hard it is to hit PSA 10 — compare against the PSA 10 count.">PSA 9</div>
+                                <div class="stat-box-value small" id="psa-9-count">---</div>
+                            </div>
+                            <div class="stat-box" style="margin-top:0;">
+                                <div class="stat-box-label" data-tooltip="Total copies ever submitted to PSA (all grades). Higher = widely known as grade-worthy. A low total with high Gem Rate = potential hidden gem.">Total Graded</div>
+                                <div class="stat-box-value small" id="psa-total">---</div>
+                            </div>
+                        </div>
+                        <div class="groupbox" style="margin-top:4px;">
+                            <div class="groupbox-label" data-tooltip="Gem Rate: the % of PSA submissions that come back as PSA 10 for this card. Higher = easier to hit gem grade (better print quality / centering). Factor this into your grading expected-value math.">Gem Rate %</div>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <div class="progress-wrap" style="flex:1;">
+                                    <div class="progress-bar" id="gem-rate-bar" style="width:0%;"></div>
+                                </div>
+                                <span style="font-weight:bold;font-size:13px;" id="gem-rate-pct">---</span>
+                            </div>
+                        </div>
+                        <div class="crt-screen mt-8" id="psa-chart-wrap" style="display:none;">
+                            <div class="crt-screen-inner">
+                                <div class="chart-wrap chart-wrap-sm">
+                                    <canvas id="chart-psa"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- E: Price Sources Comparison -->
+                <div class="window">
+                    <div class="window-title" style="background: linear-gradient(90deg, #4b0082, #8040c0);">
+                        <span class="window-title-text">C:\PRICE_SOURCES.DAT</span>
+                    </div>
+                    <div class="section-explainer">
+                        latest price from each data source
+                    </div>
+                    <div class="window-body-flush">
+                        <div class="win-table-wrap">
+                            <table class="win-table" id="source-table">
+                                <thead>
+                                    <tr>
+                                        <th>SOURCE</th>
+                                        <th>RAW</th>
+                                        <th>PSA 9</th>
+                                        <th>PSA 10</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="source-tbody">
+                                    <tr><td colspan="4" style="text-align:center;color:#808080;">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Status bar -->
+        <div class="statusbar">
+            <div class="statusbar-field" id="status-msg">Loading card data...</div>
+            <div class="statusbar-field" style="flex:1" id="status-source">---</div>
+            <div class="statusbar-field" style="flex:1" id="status-id">---</div>
+        </div>
+
+    </div><!-- /window -->
+
+</div><!-- /desktop -->
+
+<!-- Wishlist toast — toggled by js/card.js wishlist button handler -->
+<div class="wishlist-toast" id="wishlist-toast" role="status" aria-live="polite"></div>
+
+<!-- ============================================================ -->
+<!-- TASKBAR -->
+<!-- ============================================================ -->
+<div class="taskbar">
+    <button class="start-btn">
+        <span style="font-size:14px;">&#9733;</span> Start
+    </button>
+    <div class="taskbar-divider"></div>
+    <button class="taskbar-task active">POKEMETRICS.EXE</button>
+    <div class="taskbar-clock" id="clock"></div>
+</div>
+
+<script src="js/wishlist_store.js"></script>
+<script src="js/card.js"></script>
+<script>
+function updateClock() {
+    const now = new Date();
+    const h = now.getHours();
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    document.getElementById('clock').textContent = `${h % 12 || 12}:${m} ${ampm}`;
+}
+updateClock();
+setInterval(updateClock, 60000);
+</script>
+
+</body>
+</html>

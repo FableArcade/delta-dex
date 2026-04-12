@@ -1,0 +1,43 @@
+2026-04-10 17:57:42 | INFO  | bootstrap_pc starting shard=0/4: cards=1467 blank_images=False resume=True force_image=False dry_run=False
+2026-04-10 17:57:45 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/erikas-gloom-reverse-holo-2 "HTTP/1.1 302 Found"
+2026-04-10 17:57:46 | INFO  | HTTP Request: GET https://www.pricecharting.com/search-products?type=prices&q=erikas+gloom+reverse+holo+2 "HTTP/1.1 200 OK"
+2026-04-10 17:57:46 | WARNING | [1/1467] 11816239 no_match (Erika's Gloom [Reverse Holo] #2)
+2026-04-10 17:57:49 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/erikas-weepinbell-reverse-holo-5 "HTTP/1.1 302 Found"
+2026-04-10 17:57:49 | INFO  | HTTP Request: GET https://www.pricecharting.com/search-products?type=prices&q=erikas+weepinbell+reverse+holo+5 "HTTP/1.1 200 OK"
+2026-04-10 17:57:49 | WARNING | [2/1467] 11816240 no_match (Erika's Weepinbell [Reverse Holo] #5)
+2026-04-10 17:57:51 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/wurmple-reverse-holo-11 "HTTP/1.1 302 Found"
+2026-04-10 17:57:55 | INFO  | HTTP Request: GET https://www.pricecharting.com/search-products?type=prices&q=wurmple+reverse+holo+11 "HTTP/1.1 200 OK"
+2026-04-10 17:57:55 | WARNING | [3/1467] 11816243 no_match (Wurmple [Reverse Holo] #11)
+2026-04-10 17:57:56 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/beautifly-reverse-holo-13 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:57:56 | WARNING | [4/1467] 11816245 no_match (Beautifly [Reverse Holo] #13)
+2026-04-10 17:57:58 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/charmeleon-reverse-holo-21 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:57:58 | WARNING | [5/1467] 11815959 no_match (Charmeleon [Reverse Holo] #21)
+2026-04-10 17:58:02 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/ethans-slugma-23 "HTTP/1.1 302 Found"
+2026-04-10 17:58:02 | INFO  | HTTP Request: GET https://www.pricecharting.com/search-products?type=prices&q=ethans+slugma+23 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:58:02 | WARNING | [6/1467] 11815961 no_match (Ethan's Slugma #23)
+2026-04-10 17:58:05 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/ethans-magcargo-24 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:58:05 | WARNING | [7/1467] 11816385 no_match (Ethan's Magcargo #24)
+2026-04-10 17:58:08 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/ethans-magcargo-holo-24 "HTTP/1.1 302 Found"
+2026-04-10 17:58:08 | INFO  | HTTP Request: GET https://www.pricecharting.com/search-products?type=prices&q=ethans+magcargo+holo+24 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:58:08 | WARNING | [8/1467] 11815962 no_match (Ethan's Magcargo [Holo] #24)
+2026-04-10 17:58:11 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/ns-darumaka-32 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:58:11 | WARNING | [9/1467] 11816388 no_match (N's Darumaka #32)
+2026-04-10 17:58:14 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/ns-darumaka-reverse-holo-32 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:58:14 | WARNING | [10/1467] 11815970 no_match (N's Darumaka [Reverse Holo] #32)
+2026-04-10 17:58:17 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/salandit-reverse-holo-34 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:58:17 | WARNING | [11/1467] 11816256 no_match (Salandit [Reverse Holo] #34)
+2026-04-10 17:58:20 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/salazzle-reverse-holo-35 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:58:20 | WARNING | [12/1467] 11816257 no_match (Salazzle [Reverse Holo] #35)
+2026-04-10 17:58:24 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/totodile-reverse-holo-41 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:58:24 | WARNING | [13/1467] 11816259 no_match (Totodile [Reverse Holo] #41)
+2026-04-10 17:58:27 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/ns-vanillite-49 "HTTP/1.1 302 Found"
+2026-04-10 17:58:27 | INFO  | HTTP Request: GET https://www.pricecharting.com/search-products?type=prices&q=ns+vanillite+49 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:58:27 | WARNING | [14/1467] 11815986 no_match (N's Vanillite #49)
+2026-04-10 17:58:30 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/snom-reverse-holo-52 "HTTP/1.1 302 Found"
+2026-04-10 17:58:30 | INFO  | HTTP Request: GET https://www.pricecharting.com/search-products?type=prices&q=snom+reverse+holo+52 "HTTP/1.1 200 OK"
+2026-04-10 17:58:30 | WARNING | [15/1467] 11816270 no_match (Snom [Reverse Holo] #52)
+2026-04-10 17:58:32 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/pikachu-reverse-holo-55 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:58:32 | WARNING | [16/1467] 11815992 no_match (Pikachu [Reverse Holo] #55)
+2026-04-10 17:58:36 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/tapu-koko-holo-67 "HTTP/1.1 302 Found"
+2026-04-10 17:58:36 | INFO  | HTTP Request: GET https://www.pricecharting.com/search-products?type=prices&q=tapu+koko+holo+67 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:58:36 | WARNING | [17/1467] 11816004 no_match (Tapu Koko [Holo] #67)

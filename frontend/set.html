@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>POKEMETRICS.EXE - Set Detail</title>
+    <link rel="stylesheet" href="/css/win98.css">
+    <link rel="stylesheet" href="/css/retro-screen.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* ---- Set Header Stats ---- */
+        .stat-panels {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .stat-panel {
+            border: 2px groove var(--win-surface);
+            padding: 8px 8px 6px;
+            position: relative;
+        }
+
+        .stat-panel-label {
+            position: absolute;
+            top: -8px;
+            left: 8px;
+            background: var(--win-surface);
+            padding: 0 4px;
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: var(--win-text-disabled);
+        }
+
+        .stat-panel-value {
+            font-size: 18px;
+            font-weight: bold;
+            font-variant-numeric: tabular-nums;
+            margin-top: 2px;
+        }
+
+        /* ---- Set Header Layout ---- */
+        .set-header-row {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .set-header-logo {
+            width: 200px;
+            flex-shrink: 0;
+        }
+
+        .set-header-logo img {
+            width: 100%;
+            height: auto;
+            object-fit: contain;
+            image-rendering: auto;
+        }
+
+        .set-header-info {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .set-header-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+
+        .set-header-date {
+            font-size: 12px;
+            color: var(--win-text-disabled);
+            margin-bottom: 8px;
+        }
+
+        /* ---- Chart Controls ---- */
+        .chart-controls {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .chart-controls .btn {
+            font-size: 11px;
+            height: 20px;
+            padding: 0 8px;
+        }
+
+        .chart-controls .btn.active {
+            box-shadow: var(--bevel-sunken);
+            background: #d4d0c8;
+            font-weight: bold;
+        }
+
+        .chart-legend {
+            display: flex;
+            gap: 12px;
+            margin-left: auto;
+            font-size: 11px;
+        }
+
+        .chart-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .chart-legend-swatch {
+            width: 12px;
+            height: 3px;
+            display: inline-block;
+        }
+
+        /* ---- Cards Grid ---- */
+        .cards-toolbar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 8px;
+        }
+
+        .card-tile {
+            background: var(--win-surface);
+            box-shadow: var(--bevel-raised);
+            display: flex;
+            flex-direction: column;
+            cursor: pointer;
+            text-decoration: none;
+            color: var(--win-text);
+            overflow: hidden;
+        }
+
+        .card-tile:hover {
+            background: #d4d0c8;
+        }
+
+        .card-tile:active {
+            box-shadow: var(--bevel-sunken);
+        }
+
+        .card-tile-img-wrap {
+            background: #e8e8e8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px;
+            min-height: 180px;
+        }
+
+        .card-tile-img-wrap img {
+            width: 100%;
+            height: auto;
+            max-height: 200px;
+            object-fit: contain;
+            image-rendering: auto;
+        }
+
+        .card-tile-info {
+            padding: 6px 8px;
+            font-size: 11px;
+        }
+
+        .card-tile-name {
+            font-weight: bold;
+            font-size: 11px;
+            line-height: 1.2;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .card-tile-prices {
+            display: flex;
+            justify-content: space-between;
+            font-variant-numeric: tabular-nums;
+            font-size: 11px;
+        }
+
+        .card-tile-prices span {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        .card-tile-prices .price-label {
+            font-size: 9px;
+            color: var(--win-text-disabled);
+            text-transform: uppercase;
+        }
+
+        /* ---- Pack Cost Groupbox ---- */
+        .pack-cost-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            padding: 2px 0;
+            border-bottom: 1px dotted #c0c0c0;
+        }
+
+        .pack-cost-row:last-child {
+            border-bottom: none;
+        }
+
+        /* ---- Rarity table overflow ---- */
+        .rarity-table-wrap {
+            overflow-x: auto;
+        }
+
+        /* ---- Big CRT chart container ---- */
+        .ev-chart-container {
+            height: 320px;
+        }
+
+        .ev-chart-container canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        @media (max-width: 700px) {
+            .set-header-row {
+                flex-direction: column;
+                align-items: center;
+            }
+            .set-header-logo {
+                width: 160px;
+            }
+            .stat-panels {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="desktop">
+
+    <div class="window" style="max-width: 1400px; margin: 0 auto;">
+
+        <!-- Title bar -->
+        <div class="window-title">
+            <span class="window-title-text" id="window-title">POKEMETRICS.EXE - Set Detail</span>
+            <div class="window-controls">
+                <button class="window-btn">_</button>
+                <button class="window-btn">&square;</button>
+                <button class="window-btn">X</button>
+            </div>
+        </div>
+
+        <!-- Menu bar -->
+        <div class="menubar">
+            <a href="/" class="menu-item">Leaderboard</a>
+            <a href="/card_leaderboard.html" class="menu-item">Cards</a>
+            <a href="/sealed_leaderboard.html" class="menu-item">Sealed</a>
+            <a href="/sets.html" class="menu-item">Sets</a>
+            <a href="/wishlist.html" class="menu-item">Wishlist</a>
+            <a href="/search.html" class="menu-item">Search</a>
+            <a href="/calculator.html" class="menu-item">Calculator</a>
+            <a href="/about.html" class="menu-item">Help</a>
+        </div>
+
+        <!-- Content area — filled by JS -->
+        <div class="window-body" id="set-content">
+            <div style="text-align:center;padding:40px;color:#808080;">Loading set data...</div>
+        </div>
+
+        <!-- Status bar -->
+        <div class="statusbar">
+            <div class="statusbar-field" id="status-msg">Loading...</div>
+            <div class="statusbar-field" style="flex:1" id="status-cards"></div>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Taskbar -->
+<div class="taskbar">
+    <button class="start-btn">
+        <span style="font-size:14px;">&#9733;</span> Start
+    </button>
+    <div class="taskbar-divider"></div>
+    <button class="taskbar-task active" id="taskbar-label">SET.EXE</button>
+    <div class="taskbar-clock" id="clock"></div>
+</div>
+
+<script src="/js/set.js"></script>
+<script>
+function updateClock() {
+    const now = new Date();
+    const h = now.getHours();
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    document.getElementById('clock').textContent = `${h % 12 || 12}:${m} ${ampm}`;
+}
+updateClock();
+setInterval(updateClock, 60000);
+</script>
+
+</body>
+</html>

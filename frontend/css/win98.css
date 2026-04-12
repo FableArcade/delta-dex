@@ -1,0 +1,673 @@
+/* ============================================================
+   Windows 98 Design System
+   Hard edges, beveled borders, system grays, pixel vibes
+   ============================================================ */
+
+:root {
+    --win-bg: #008080;           /* Classic teal desktop */
+    --win-surface: #c0c0c0;      /* Window gray */
+    --win-surface-dark: #808080;
+    --win-surface-light: #dfdfdf;
+    --win-white: #ffffff;
+    --win-black: #000000;
+    --win-blue: #000080;         /* Title bar blue */
+    --win-blue-light: #1084d0;
+    --win-text: #000000;
+    --win-text-disabled: #808080;
+    --win-highlight: #000080;
+    --win-highlight-text: #ffffff;
+    --win-yellow: #ffff00;
+    --win-red: #ff0000;
+    --win-green: #008000;
+    --win-link: #0000ff;
+
+    /* Beveled border shortcuts */
+    --bevel-raised: inset -1px -1px #0a0a0a, inset 1px 1px #ffffff, inset -2px -2px #808080, inset 2px 2px #dfdfdf;
+    --bevel-sunken: inset -1px -1px #ffffff, inset 1px 1px #0a0a0a, inset -2px -2px #dfdfdf, inset 2px 2px #808080;
+    --bevel-window: inset -1px -1px #0a0a0a, inset 1px 1px #dfdfdf, inset -2px -2px #808080, inset 2px 2px #ffffff;
+}
+
+/* W95FA font - uncomment when deployed with local font file
+@font-face {
+    font-family: 'W95FA';
+    src: url('/fonts/W95FA.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+*/
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    font-size: 13px;
+}
+
+body {
+    font-family: 'Microsoft Sans Serif', 'MS Sans Serif', 'Segoe UI', Tahoma, Arial, sans-serif;
+    background: var(--win-bg);
+    color: var(--win-text);
+    min-height: 100vh;
+    -webkit-font-smoothing: none;
+    -moz-osx-font-smoothing: unset;
+}
+
+/* ============================================================
+   Desktop
+   ============================================================ */
+
+.desktop {
+    padding: 8px;
+    min-height: 100vh;
+}
+
+/* ============================================================
+   Window
+   ============================================================ */
+
+.window {
+    background: var(--win-surface);
+    box-shadow: var(--bevel-raised);
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 8px;
+}
+
+.window-title {
+    background: linear-gradient(90deg, var(--win-blue), var(--win-blue-light));
+    color: var(--win-highlight-text);
+    padding: 4px 4px 4px 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: bold;
+    font-size: 14px;
+    user-select: none;
+    letter-spacing: 0.5px;
+    text-shadow: 1px 1px 0 rgba(0,0,0,0.3);
+}
+
+.window-title-text {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.window-title-icon {
+    width: 16px;
+    height: 16px;
+    image-rendering: pixelated;
+}
+
+.window-controls {
+    display: flex;
+    gap: 2px;
+}
+
+.window-btn {
+    width: 16px;
+    height: 14px;
+    background: var(--win-surface);
+    box-shadow: var(--bevel-raised);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: bold;
+    line-height: 1;
+    padding: 0;
+    color: var(--win-text);
+}
+
+.window-btn:active {
+    box-shadow: var(--bevel-sunken);
+}
+
+.window-body {
+    padding: 8px;
+}
+
+.window-body-flush {
+    padding: 0;
+}
+
+/* ============================================================
+   Menubar
+   ============================================================ */
+
+.menubar {
+    display: flex;
+    gap: 0;
+    padding: 2px 4px;
+    background: var(--win-surface);
+    border-bottom: 1px solid var(--win-surface-dark);
+}
+
+.menu-item {
+    padding: 2px 8px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.menu-item:hover {
+    background: var(--win-highlight);
+    color: var(--win-highlight-text);
+}
+
+/* ============================================================
+   Statusbar
+   ============================================================ */
+
+.statusbar {
+    display: flex;
+    gap: 2px;
+    padding: 2px 4px;
+    background: var(--win-surface);
+}
+
+.statusbar-field {
+    box-shadow: var(--bevel-sunken);
+    padding: 2px 6px;
+    font-size: 11px;
+    color: var(--win-text);
+    flex: 1;
+}
+
+.statusbar-field:first-child {
+    flex: 3;
+}
+
+/* ============================================================
+   Taskbar
+   ============================================================ */
+
+.taskbar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    height: 32px;
+    background: var(--win-surface);
+    box-shadow: inset 0 1px 0 #ffffff;
+    display: flex;
+    align-items: center;
+    padding: 2px 4px;
+    gap: 4px;
+}
+
+.start-btn {
+    height: 24px;
+    padding: 0 8px;
+    background: var(--win-surface);
+    box-shadow: var(--bevel-raised);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-family: inherit;
+    font-weight: bold;
+    font-size: 12px;
+}
+
+.start-btn:active {
+    box-shadow: var(--bevel-sunken);
+}
+
+.start-btn img {
+    width: 16px;
+    height: 16px;
+    image-rendering: pixelated;
+}
+
+.taskbar-divider {
+    width: 2px;
+    height: 20px;
+    box-shadow: inset -1px 0 #ffffff, inset 1px 0 #808080;
+}
+
+.taskbar-task {
+    height: 24px;
+    padding: 0 8px;
+    background: var(--win-surface);
+    box-shadow: var(--bevel-raised);
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    max-width: 160px;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.taskbar-task.active {
+    box-shadow: var(--bevel-sunken);
+    background: #dfdfdf;
+}
+
+.taskbar-clock {
+    margin-left: auto;
+    box-shadow: var(--bevel-sunken);
+    padding: 2px 8px;
+    font-size: 11px;
+}
+
+/* ============================================================
+   Navigation pills (tab-style)
+   ============================================================ */
+
+.nav-tabs {
+    display: flex;
+    gap: 0;
+    padding: 0 8px;
+    margin-bottom: -1px;
+    position: relative;
+    z-index: 1;
+}
+
+.nav-tab {
+    padding: 4px 12px;
+    background: var(--win-surface);
+    box-shadow: inset -1px 0 #0a0a0a, inset 1px 1px #ffffff, inset -2px 0 #808080, inset 2px 1px #dfdfdf;
+    cursor: pointer;
+    font-size: 12px;
+    text-decoration: none;
+    color: var(--win-text);
+    position: relative;
+    top: 2px;
+    border-radius: 3px 3px 0 0;
+}
+
+.nav-tab:hover {
+    background: #d4d0c8;
+}
+
+.nav-tab.active {
+    background: var(--win-surface);
+    top: 0;
+    padding-bottom: 6px;
+    box-shadow: inset -1px -1px var(--win-surface), inset 1px 1px #ffffff, inset -2px -2px #808080, inset 2px 1px #dfdfdf;
+    font-weight: bold;
+    z-index: 2;
+}
+
+/* ============================================================
+   Tables
+   ============================================================ */
+
+.win-table-wrap {
+    box-shadow: var(--bevel-sunken);
+    background: var(--win-white);
+    overflow-x: auto;
+}
+
+table.win-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+table.win-table thead th {
+    background: var(--win-surface);
+    box-shadow: var(--bevel-raised);
+    padding: 3px 8px;
+    text-align: left;
+    font-weight: bold;
+    font-size: 11px;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+table.win-table thead th:hover {
+    background: #d4d0c8;
+}
+
+table.win-table tbody td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #e8e8e8;
+    vertical-align: middle;
+    white-space: nowrap;
+    font-size: 12px;
+}
+
+table.win-table tbody tr:hover {
+    background: var(--win-highlight);
+    color: var(--win-highlight-text);
+    cursor: pointer;
+}
+
+table.win-table tbody tr:hover .chip-neg,
+table.win-table tbody tr:hover .chip-pos,
+table.win-table tbody tr:hover .chip-neu {
+    color: var(--win-highlight-text);
+    background: transparent;
+    border-color: rgba(255,255,255,0.3);
+}
+
+/* ============================================================
+   Chips (gain/loss badges)
+   ============================================================ */
+
+.chip {
+    display: inline-block;
+    padding: 2px 8px;
+    font-weight: bold;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    border: 1px solid;
+}
+
+.chip-pos {
+    color: #008000;
+    background: #c8ffc8;
+    border-color: #008000;
+}
+
+.chip-neg {
+    color: #cc0000;
+    background: #ffc8c8;
+    border-color: #cc0000;
+}
+
+.chip-neu {
+    color: #444;
+    background: #e8e8e8;
+    border-color: #808080;
+}
+
+/* ============================================================
+   Rank badge
+   ============================================================ */
+
+.rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 22px;
+    background: var(--win-surface);
+    box-shadow: var(--bevel-raised);
+    font-weight: bold;
+    font-size: 12px;
+}
+
+.rank-1 { background: #ffd700; }
+.rank-2 { background: #c0c0c0; }
+.rank-3 { background: #cd7f32; color: #fff; }
+
+/* ============================================================
+   Set logo in table
+   ============================================================ */
+
+.set-logo-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.set-logo {
+    width: 90px;
+    height: 46px;
+    object-fit: contain;
+    image-rendering: auto;
+}
+
+/* ============================================================
+   Layout grid
+   ============================================================ */
+
+.grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+@media (max-width: 900px) {
+    .grid-2 {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ============================================================
+   Section header inside window body
+   ============================================================ */
+
+.section-header {
+    background: var(--win-surface);
+    box-shadow: var(--bevel-raised);
+    padding: 4px 8px;
+    margin-bottom: 4px;
+    font-weight: bold;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.section-icon {
+    font-size: 14px;
+}
+
+.section-explainer {
+    padding: 4px 8px;
+    margin-bottom: 4px;
+    font-size: 11px;
+    color: var(--win-text-disabled);
+    box-shadow: var(--bevel-sunken);
+    background: var(--win-white);
+}
+
+/* ============================================================
+   Mini chart in table
+   ============================================================ */
+
+.mini-chart-wrap {
+    width: 120px;
+    height: 36px;
+}
+
+.mini-chart-wrap canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* ============================================================
+   Scrollable table container
+   ============================================================ */
+
+.table-scroll {
+    max-height: 380px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Classic scrollbar styling */
+.table-scroll::-webkit-scrollbar {
+    width: 16px;
+}
+
+.table-scroll::-webkit-scrollbar-track {
+    background: repeating-conic-gradient(#c0c0c0 0% 25%, #fff 0% 50%) 50%/2px 2px;
+}
+
+.table-scroll::-webkit-scrollbar-thumb {
+    background: var(--win-surface);
+    box-shadow: var(--bevel-raised);
+}
+
+.table-scroll::-webkit-scrollbar-button {
+    background: var(--win-surface);
+    box-shadow: var(--bevel-raised);
+    height: 16px;
+}
+
+/* ============================================================
+   Buttons
+   ============================================================ */
+
+.btn {
+    height: 24px;
+    padding: 0 12px;
+    background: var(--win-surface);
+    box-shadow: var(--bevel-raised);
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+}
+
+.btn:active {
+    box-shadow: var(--bevel-sunken);
+}
+
+.btn:focus {
+    outline: 1px dotted #000;
+    outline-offset: -4px;
+}
+
+.btn-primary {
+    font-weight: bold;
+    box-shadow: var(--bevel-raised), 0 0 0 1px #000;
+}
+
+/* ============================================================
+   Inputs
+   ============================================================ */
+
+input.win-input, select.win-input {
+    height: 22px;
+    padding: 2px 4px;
+    background: var(--win-white);
+    box-shadow: var(--bevel-sunken);
+    border: none;
+    font-family: inherit;
+    font-size: 12px;
+    outline: none;
+}
+
+select.win-input {
+    cursor: pointer;
+}
+
+/* ============================================================
+   Groupbox
+   ============================================================ */
+
+.groupbox {
+    border: 2px groove var(--win-surface);
+    padding: 10px 8px 8px;
+    position: relative;
+    margin-top: 8px;
+}
+
+.groupbox-label {
+    position: absolute;
+    top: -8px;
+    left: 10px;
+    background: var(--win-surface);
+    padding: 0 4px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+/* ============================================================
+   Progress bar
+   ============================================================ */
+
+.progress-wrap {
+    box-shadow: var(--bevel-sunken);
+    height: 18px;
+    padding: 2px;
+    background: var(--win-surface);
+}
+
+.progress-bar {
+    height: 100%;
+    background: repeating-linear-gradient(
+        90deg,
+        var(--win-blue) 0px,
+        var(--win-blue) 8px,
+        transparent 8px,
+        transparent 10px
+    );
+}
+
+/* ============================================================
+   Tooltips
+   ============================================================ */
+
+.win-tooltip {
+    position: absolute;
+    background: #ffffe1;
+    border: 1px solid #000;
+    padding: 2px 6px;
+    font-size: 11px;
+    pointer-events: none;
+    z-index: 1000;
+    white-space: nowrap;
+}
+
+/* ============================================================
+   Hero / header area
+   ============================================================ */
+
+.hero-text {
+    padding: 8px;
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+.hero-title {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.hero-subtitle {
+    color: var(--win-text-disabled);
+    font-size: 12px;
+}
+
+.updated-badge {
+    display: inline-block;
+    background: var(--win-yellow);
+    color: var(--win-black);
+    padding: 1px 6px;
+    font-size: 11px;
+    font-weight: bold;
+    box-shadow: var(--bevel-raised);
+}
+
+/* ============================================================
+   Utility
+   ============================================================ */
+
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+.text-mono { font-variant-numeric: tabular-nums; }
+.mt-4 { margin-top: 4px; }
+.mt-8 { margin-top: 8px; }
+.mb-8 { margin-bottom: 8px; }
+.gap-8 { gap: 8px; }
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+
+/* padding for taskbar */
+body { padding-bottom: 40px; }

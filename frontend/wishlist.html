@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WISHLIST.EXE - prioritized buy list</title>
+    <link rel="stylesheet" href="css/win98.css">
+    <link rel="stylesheet" href="css/retro-screen.css">
+    <style>
+        .wl-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 2px groove var(--win-surface);
+            background: var(--win-surface);
+        }
+        .wl-control { display: flex; flex-direction: column; gap: 2px; }
+        .wl-control label {
+            font-size: 10px;
+            color: #404040;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .wl-control input, .wl-control select {
+            height: 24px;
+            border: none;
+            box-shadow: var(--bevel-sunken);
+            background: var(--win-white);
+            padding: 2px 6px;
+            font-family: inherit;
+            font-size: 12px;
+            font-variant-numeric: tabular-nums;
+        }
+        .wl-control input[type="number"] { width: 120px; }
+        .wl-control select               { width: 160px; }
+
+        .wl-headline {
+            margin-left: auto;
+            font-size: 11px;
+            color: #404040;
+            padding: 4px 10px;
+            background: #f8f8c8;
+            border: 1px solid #c0a040;
+        }
+        .wl-headline strong { color: #604000; }
+
+        .wl-empty {
+            padding: 48px 24px;
+            text-align: center;
+            color: #808080;
+            font-size: 13px;
+        }
+        .wl-empty strong { color: #404040; }
+
+        /* Table */
+        .wl-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+        .wl-table th,
+        .wl-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #e0e0e0;
+            vertical-align: top;
+        }
+        .wl-table thead th {
+            background: #e8e8e8;
+            text-align: left;
+            border-bottom: 2px groove var(--win-surface);
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 10px;
+            color: #404040;
+        }
+        .wl-table tbody tr { cursor: pointer; }
+        .wl-table tbody tr:hover { background: #fffae0; }
+        .wl-table .rank-cell {
+            text-align: center;
+            font-weight: bold;
+            font-size: 14px;
+            width: 40px;
+        }
+        .wl-table .rank-1 { color: #c08000; }
+        .wl-table .rank-2 { color: #808080; }
+        .wl-table .rank-3 { color: #a06030; }
+
+        .wl-img {
+            width: 60px;
+            height: 84px;
+            object-fit: contain;
+            image-rendering: auto;
+        }
+        .wl-name { font-weight: bold; font-size: 12px; color: #202020; }
+        .wl-set  { font-size: 10px; color: #606060; margin-top: 2px; }
+        .wl-remove-btn {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 1px 6px;
+            font-size: 9px;
+            background: var(--win-surface);
+            border: 1px outset var(--win-surface);
+            color: #800000;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .wl-remove-btn:active { border-style: inset; }
+
+        .wl-price { font-family: "Lucida Console", monospace; font-variant-numeric: tabular-nums; }
+        .wl-fit-chip {
+            display: inline-block;
+            min-width: 40px;
+            padding: 3px 8px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 13px;
+            border: 1px solid #404040;
+        }
+        .wl-fit-strong { background: #c8ffc8; color: #004000; }
+        .wl-fit-solid  { background: #fff4c8; color: #604000; }
+        .wl-fit-weak   { background: #f0f0f0; color: #606060; }
+        .wl-fit-drop   { background: #ffd8d8; color: #800000; }
+
+        .wl-rationale {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            color: #404040;
+            font-size: 10px;
+            line-height: 1.4;
+        }
+        .wl-rationale li::before {
+            content: "· ";
+            color: #808080;
+        }
+
+        .wl-pct-bar {
+            display: inline-block;
+            width: 80px;
+            height: 6px;
+            background: #e0e0e0;
+            border: 1px solid #808080;
+            vertical-align: middle;
+            margin-right: 4px;
+        }
+        .wl-pct-bar-fill {
+            display: block;
+            height: 100%;
+            background: linear-gradient(90deg, #80c080, #c0e080);
+        }
+
+        .wl-over-budget {
+            opacity: 0.5;
+            background: #fff0f0;
+        }
+        .wl-over-budget td { text-decoration: line-through; }
+        .opp-philosophy {
+            font-size: 11px;
+            font-weight: bold;
+            color: #404040;
+            padding: 2px 8px;
+            background: #f0f0f8;
+            border: 1px solid #c0c0c0;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+
+<div class="desktop">
+    <div class="window" style="max-width: 1400px; margin: 0 auto;">
+
+        <!-- Title bar -->
+        <div class="window-title">
+            <span class="window-title-text">WISHLIST.EXE - prioritized buy list</span>
+            <div class="window-controls">
+                <button class="window-btn">_</button>
+                <button class="window-btn">&square;</button>
+                <button class="window-btn">X</button>
+            </div>
+        </div>
+
+        <!-- Menu bar -->
+        <div class="menubar">
+            <a href="/" class="menu-item">Leaderboard</a>
+            <a href="/card_leaderboard.html" class="menu-item">Cards</a>
+            <a href="/sealed_leaderboard.html" class="menu-item">Sealed</a>
+            <a href="/sets.html" class="menu-item">Sets</a>
+            <a href="/wishlist.html" class="menu-item" style="font-weight:bold;">Wishlist</a>
+            <a href="/search.html" class="menu-item">Search</a>
+            <a href="/calculator.html" class="menu-item">Calculator</a>
+            <a href="/about.html" class="menu-item">Help</a>
+        </div>
+
+        <!-- Hero -->
+        <div class="window-body" style="border-bottom: 2px groove var(--win-surface);">
+            <div class="hero-text">
+                <div class="hero-title">your prioritized buy list</div>
+                <div class="hero-subtitle">
+                    Star cards from any card detail page. This view ranks them by fit score given
+                    your <strong>budget</strong> + <strong>holding horizon</strong>, so you know
+                    which one to buy <em>first</em> instead of spreading thin. Scoring blends
+                    all five Must Buy dimensions, the Long-Term Hold formula, 30d price
+                    trajectory, and a budget-fit bonus.
+                </div>
+            </div>
+        </div>
+
+        <div class="opp-philosophy" style="margin:8px 12px 0;">Value screen: mean-reversion model — ranks cards that have fallen from peak with cultural staying power to recover. Opposite of the Long-Term Holds momentum screen.</div>
+
+        <!-- Toolbar: Budget + Horizon inputs -->
+        <div class="wl-toolbar">
+            <div class="wl-control">
+                <label for="wl-budget">Total budget ($)</label>
+                <input type="number" id="wl-budget" min="0" step="25" value="1000" placeholder="1000">
+            </div>
+            <div class="wl-control">
+                <label for="wl-horizon">Holding horizon</label>
+                <select id="wl-horizon">
+                    <option value="short">Short (&le; 30 days)</option>
+                    <option value="medium" selected>Medium (90 days - 6 months)</option>
+                    <option value="long">Long (1 year+)</option>
+                </select>
+            </div>
+            <div class="wl-control">
+                <label for="wl-sort">Sort</label>
+                <select id="wl-sort">
+                    <option value="fit" selected>Fit Score (priority)</option>
+                    <option value="added">Date Added (newest)</option>
+                    <option value="price_asc">Price (low &rarr; high)</option>
+                    <option value="price_desc">Price (high &rarr; low)</option>
+                </select>
+            </div>
+            <div class="wl-headline" id="wl-headline">
+                Add cards to your wishlist from any card page.
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="window-body-flush">
+            <div class="win-table-wrap">
+                <div class="table-scroll" style="max-height: 70vh;">
+                    <table class="wl-table" id="wl-table">
+                        <thead>
+                            <tr>
+                                <th style="width:40px;">#</th>
+                                <th style="width:70px;">Image</th>
+                                <th>Card</th>
+                                <th style="width:90px;">Price</th>
+                                <th style="width:120px;">% of Budget</th>
+                                <th style="width:80px;">Fit</th>
+                                <th>Why</th>
+                            </tr>
+                        </thead>
+                        <tbody id="wl-tbody">
+                            <tr>
+                                <td colspan="7" class="wl-empty">
+                                    <strong>Your wishlist is empty.</strong><br>
+                                    Open any card detail page and click the <strong>☆ Add to Wishlist</strong> button.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status bar -->
+        <div class="statusbar">
+            <div class="statusbar-field" id="wl-status">Ready.</div>
+            <div class="statusbar-field" style="flex:1" id="wl-status-horizon">---</div>
+            <div class="statusbar-field" style="flex:1" id="wl-status-budget">---</div>
+        </div>
+
+    </div><!-- /window -->
+</div><!-- /desktop -->
+
+<!-- Taskbar -->
+<div class="taskbar">
+    <button class="start-btn"><span style="font-size:14px;">&#9733;</span> Start</button>
+    <div class="taskbar-divider"></div>
+    <button class="taskbar-task active">WISHLIST.EXE</button>
+    <div class="taskbar-clock" id="clock"></div>
+</div>
+
+<script src="js/wishlist_store.js"></script>
+<script src="js/wishlist.js"></script>
+<script>
+    // Simple clock for the taskbar (matches other pages)
+    function tick() {
+        const el = document.getElementById("clock");
+        if (!el) return;
+        const d = new Date();
+        const h = d.getHours();
+        const m = String(d.getMinutes()).padStart(2, "0");
+        const ampm = h >= 12 ? "PM" : "AM";
+        el.textContent = `${((h + 11) % 12) + 1}:${m} ${ampm}`;
+    }
+    tick();
+    setInterval(tick, 30000);
+</script>
+
+</body>
+</html>

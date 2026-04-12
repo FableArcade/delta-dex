@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SEARCH.EXE - card search</title>
+    <link rel="stylesheet" href="css/win98.css">
+    <link rel="stylesheet" href="css/retro-screen.css">
+    <style>
+        .search-bar {
+            display: flex;
+            gap: 4px;
+            padding: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .search-bar input.win-input {
+            flex: 1;
+            min-width: 200px;
+            height: 26px;
+            font-size: 14px;
+        }
+        .filter-row {
+            display: flex;
+            gap: 4px;
+            padding: 0 8px 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .filter-row label {
+            font-size: 11px;
+            font-weight: bold;
+            margin-right: 2px;
+        }
+        .filter-row select.win-input {
+            min-width: 120px;
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 8px;
+            padding: 8px;
+        }
+        .card-tile {
+            cursor: pointer;
+        }
+        .card-tile .window-body {
+            padding: 6px;
+            text-align: center;
+        }
+        .card-tile img {
+            width: 100%;
+            max-width: 150px;
+            height: auto;
+            object-fit: contain;
+            image-rendering: auto;
+            margin-bottom: 4px;
+        }
+        .card-tile .card-name {
+            font-size: 11px;
+            font-weight: bold;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .card-tile .card-meta {
+            font-size: 10px;
+            color: var(--win-text-disabled);
+        }
+        .card-tile .card-prices {
+            font-size: 11px;
+            margin-top: 4px;
+            font-variant-numeric: tabular-nums;
+        }
+    </style>
+</head>
+<body>
+
+<div class="desktop">
+
+    <!-- MAIN WINDOW -->
+    <div class="window" style="max-width: 1400px; margin: 0 auto;">
+
+        <!-- Title bar -->
+        <div class="window-title">
+            <span class="window-title-text">SEARCH.EXE - Card Search</span>
+            <div class="window-controls">
+                <button class="window-btn">_</button>
+                <button class="window-btn">&square;</button>
+                <button class="window-btn">X</button>
+            </div>
+        </div>
+
+        <!-- Menu bar -->
+        <div class="menubar">
+            <a href="/" class="menu-item">Leaderboard</a>
+            <a href="/card_leaderboard.html" class="menu-item">Cards</a>
+            <a href="/sealed_leaderboard.html" class="menu-item">Sealed</a>
+            <a href="/sets.html" class="menu-item">Sets</a>
+            <a href="/wishlist.html" class="menu-item">Wishlist</a>
+            <a href="/search.html" class="menu-item" style="font-weight:bold;">Search</a>
+            <a href="/calculator.html" class="menu-item">Calculator</a>
+            <a href="/about.html" class="menu-item">Help</a>
+        </div>
+
+        <!-- Search bar -->
+        <div class="search-bar">
+            <input type="text" class="win-input" id="search-input" placeholder="Search cards by name...">
+            <button class="btn btn-primary" id="search-btn">Search</button>
+        </div>
+
+        <!-- Filters -->
+        <div class="filter-row">
+            <label>Rarity:</label>
+            <select class="win-input" id="rarity-filter">
+                <option value="">All Rarities</option>
+            </select>
+
+            <label>Sort:</label>
+            <select class="win-input" id="sort-filter">
+                <option value="psa10-desc">PSA 10 Price (High-Low)</option>
+                <option value="psa10-asc">PSA 10 Price (Low-High)</option>
+                <option value="raw-desc">Raw Price (High-Low)</option>
+                <option value="raw-asc">Raw Price (Low-High)</option>
+                <option value="name-asc">Name (A-Z)</option>
+                <option value="name-desc">Name (Z-A)</option>
+            </select>
+        </div>
+
+        <!-- Results grid -->
+        <div class="window-body-flush" style="border-top: 2px groove var(--win-surface);">
+            <div class="card-grid" id="results-grid">
+                <div style="grid-column: 1 / -1; text-align:center; color:#808080; padding:40px;">
+                    Enter a search term above to find cards.
+                </div>
+            </div>
+        </div>
+
+        <!-- Status bar -->
+        <div class="statusbar">
+            <div class="statusbar-field" id="status-msg">Ready</div>
+            <div class="statusbar-field" style="flex:1" id="status-count">0 results</div>
+        </div>
+
+    </div><!-- /window -->
+
+</div><!-- /desktop -->
+
+<!-- TASKBAR -->
+<div class="taskbar">
+    <button class="start-btn">
+        <span style="font-size:14px;">&#9733;</span> Start
+    </button>
+    <div class="taskbar-divider"></div>
+    <button class="taskbar-task active">SEARCH.EXE</button>
+    <div class="taskbar-clock" id="clock"></div>
+</div>
+
+<script src="js/search.js"></script>
+<script>
+function updateClock() {
+    const now = new Date();
+    const h = now.getHours();
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    document.getElementById('clock').textContent = `${h % 12 || 12}:${m} ${ampm}`;
+}
+updateClock();
+setInterval(updateClock, 60000);
+</script>
+
+</body>
+</html>

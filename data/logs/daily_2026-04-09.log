@@ -1,0 +1,22 @@
+2026-04-10 12:41:18 | pipeline.daily         | INFO  | [DRY RUN] would insert pipeline_runs row for stage=daily:all
+2026-04-10 12:41:18 | pipeline.daily         | INFO  | [stage] scrape:pricecharting
+2026-04-10 12:41:18 | pipeline.daily         | INFO  | [DRY RUN] would run scraper pricecharting (~300 min)
+2026-04-10 12:41:18 | pipeline.daily         | INFO  | [stage] scrape:onethirty_point
+2026-04-10 12:41:18 | pipeline.daily         | INFO  | [DRY RUN] would run scraper onethirty_point (~25 min)
+2026-04-10 12:41:18 | pipeline.daily         | INFO  | [stage] scrape:tcgplayer
+2026-04-10 12:41:18 | pipeline.daily         | INFO  | [DRY RUN] would run scraper tcgplayer (~15 min)
+2026-04-10 12:41:18 | pipeline.daily         | INFO  | [stage] transform:interpolation
+2026-04-10 12:41:18 | pipeline.daily         | INFO  | [DRY RUN] would interpolate price_history
+2026-04-10 12:41:18 | pipeline.daily         | INFO  | [stage] transform:ebay_derived
+2026-04-10 12:41:18 | pipeline.daily         | INFO  | [DRY RUN] would compute ebay_derived
+2026-04-10 12:41:18 | pipeline.daily         | INFO  | [stage] transform:composite_price
+2026-04-10 12:41:18 | pipeline.daily         | INFO  | [DRY RUN] would compute composite_price
+2026-04-10 12:41:18 | pipeline.daily         | INFO  | [stage] compute:ev_calculator
+2026-04-10 12:41:18 | pipeline.daily         | INFO  | [DRY RUN] would run compute.ev_calculator
+2026-04-10 12:41:18 | pipeline.daily         | INFO  | [stage] compute:pack_cost
+2026-04-10 12:41:18 | pipeline.daily         | INFO  | [DRY RUN] would run compute.pack_cost
+2026-04-10 12:41:18 | pipeline.daily         | INFO  | [stage] compute:market_pressure
+2026-04-10 12:41:18 | pipeline.daily         | INFO  | [DRY RUN] would run compute.market_pressure
+2026-04-10 12:41:18 | pipeline.daily         | INFO  | [stage] compute:leaderboard
+2026-04-10 12:41:18 | pipeline.daily         | INFO  | [DRY RUN] would run compute.leaderboard
+2026-04-10 12:41:18 | pipeline.daily         | INFO  | [DRY RUN] would finish pipeline_runs: status=done notes=date=2026-04-09 | scrape:pricecharting=0.0s | scrape:onethirty_point=0.0s | scrape:tcgplayer=0.0s | transform:interpolation=0.0s | transform:ebay_derived=0.0s | transform:composite_price=0.0s | compute:ev_calculator=0.0s | compute:pack_cost=0.0s | compute:market_pressure=0.0s | compute:leaderboard=0.0s

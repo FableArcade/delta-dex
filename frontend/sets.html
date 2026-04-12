@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>C:\POKEMON\SETS.EXE</title>
+    <link rel="stylesheet" href="css/win98.css">
+    <link rel="stylesheet" href="css/retro-screen.css">
+    <style>
+        .sets-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 8px;
+            padding: 0;
+        }
+
+        .set-tile {
+            background: var(--win-surface);
+            box-shadow: var(--bevel-raised);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 8px;
+            cursor: pointer;
+            text-decoration: none;
+            color: var(--win-text);
+            transition: none;
+            min-height: 120px;
+        }
+
+        .set-tile:hover {
+            background: var(--win-highlight);
+            color: var(--win-highlight-text);
+        }
+
+        .set-tile:active {
+            box-shadow: var(--bevel-sunken);
+        }
+
+        .set-tile img {
+            width: 140px;
+            height: 70px;
+            object-fit: contain;
+            image-rendering: auto;
+            margin-bottom: 8px;
+        }
+
+        .set-tile:hover img {
+            filter: brightness(2);
+        }
+
+        .set-tile-name {
+            font-size: 11px;
+            font-weight: bold;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        .set-tile-stats {
+            font-size: 10px;
+            color: var(--win-text-disabled);
+            text-align: center;
+            margin-top: 4px;
+        }
+
+        .set-tile:hover .set-tile-stats {
+            color: rgba(255,255,255,0.7);
+        }
+
+        .loading-msg {
+            text-align: center;
+            padding: 40px;
+            color: var(--win-text-disabled);
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="desktop">
+
+    <div class="window" style="max-width: 1400px; margin: 0 auto;">
+
+        <!-- Title bar -->
+        <div class="window-title">
+            <span class="window-title-text">C:\POKEMON\SETS.EXE</span>
+            <div class="window-controls">
+                <button class="window-btn">_</button>
+                <button class="window-btn">&square;</button>
+                <button class="window-btn">X</button>
+            </div>
+        </div>
+
+        <!-- Menu bar -->
+        <div class="menubar">
+            <a href="/" class="menu-item">Leaderboard</a>
+            <a href="/card_leaderboard.html" class="menu-item">Cards</a>
+            <a href="/sealed_leaderboard.html" class="menu-item">Sealed</a>
+            <a href="/sets.html" class="menu-item" style="font-weight:bold;">Sets</a>
+            <a href="/wishlist.html" class="menu-item">Wishlist</a>
+            <a href="/search.html" class="menu-item">Search</a>
+            <a href="/calculator.html" class="menu-item">Calculator</a>
+            <a href="/about.html" class="menu-item">Help</a>
+        </div>
+
+        <!-- Hero -->
+        <div class="window-body" style="border-bottom: 2px groove var(--win-surface);">
+            <div class="flex items-center justify-between">
+                <div class="hero-text">
+                    <div class="hero-title">all tracked sets</div>
+                    <div class="hero-subtitle">
+                        click any set to see full analytics: EV, rarity breakdown, card prices, and history charts.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Body: Sets Grid -->
+        <div class="window-body">
+            <div id="sets-grid" class="sets-grid">
+                <div class="loading-msg" style="grid-column: 1 / -1;">Loading sets...</div>
+            </div>
+        </div>
+
+        <!-- Status bar -->
+        <div class="statusbar">
+            <div class="statusbar-field" id="status-msg">Ready</div>
+            <div class="statusbar-field" style="flex:1" id="status-count">Loading...</div>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Taskbar -->
+<div class="taskbar">
+    <button class="start-btn">
+        <span style="font-size:14px;">&#9733;</span> Start
+    </button>
+    <div class="taskbar-divider"></div>
+    <button class="taskbar-task active">SETS.EXE</button>
+    <div class="taskbar-clock" id="clock"></div>
+</div>
+
+<script>
+const API_BASE = "/api";
+
+function money2(x) {
+    if (x === null || x === undefined || Number.isNaN(x)) return "\u2014";
+    return Number(x).toLocaleString("en-US", {
+        style: "currency", currency: "USD",
+        minimumFractionDigits: 2, maximumFractionDigits: 2
+    });
+}
+
+function chipClass(v) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "chip chip-neu";
+    if (Math.abs(n) < 0.05) return "chip chip-neu";
+    return n >= 0 ? "chip chip-pos" : "chip chip-neg";
+}
+
+function logoSrc(setCode) {
+    return `https://mycollectrics.com/images/logos/sets/small/${encodeURIComponent(setCode)}.png`;
+}
+
+async function loadSets() {
+    const grid = document.getElementById("sets-grid");
+    const statusMsg = document.getElementById("status-msg");
+    const statusCount = document.getElementById("status-count");
+
+    try {
+        statusMsg.textContent = "Loading sets...";
+        const res = await fetch(`${API_BASE}/sets_index`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const sets = Array.isArray(data.sets) ? data.sets : [];
+
+        if (sets.length === 0) {
+            grid.innerHTML = '<div class="loading-msg" style="grid-column: 1 / -1;">No sets found.</div>';
+            return;
+        }
+
+        grid.innerHTML = sets.map(s => {
+            const code = s["set-code"];
+            const gl = s["avg-gain-loss"];
+            const glDisplay = gl !== null && gl !== undefined ? money2(gl) : "";
+            const glCls = chipClass(gl);
+            return `
+                <a href="/sets/${encodeURIComponent(code)}" class="set-tile">
+                    <img src="${logoSrc(code)}" alt="${code}" loading="lazy">
+                    <div class="set-tile-name">${s["set-name"] || code}</div>
+                    <div class="set-tile-stats">
+                        EV: ${money2(s["ev-raw-per-pack"])}
+                        ${glDisplay ? `&nbsp;|&nbsp; <span class="${glCls}" style="padding:1px 4px;font-size:10px;">${glDisplay}</span>` : ""}
+                    </div>
+                </a>
+            `;
+        }).join("");
+
+        statusMsg.textContent = "Ready";
+        statusCount.textContent = `${sets.length} sets tracked`;
+
+    } catch (err) {
+        console.error(err);
+        grid.innerHTML = `<div class="loading-msg" style="grid-column: 1 / -1; color:#cc0000;">Failed to load sets: ${err.message}</div>`;
+        statusMsg.textContent = `Error: ${err.message}`;
+    }
+}
+
+// Clock
+function updateClock() {
+    const now = new Date();
+    const h = now.getHours();
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    document.getElementById('clock').textContent = `${h % 12 || 12}:${m} ${ampm}`;
+}
+updateClock();
+setInterval(updateClock, 60000);
+
+loadSets();
+</script>
+
+</body>
+</html>

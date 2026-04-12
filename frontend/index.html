@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>POKEMETRICS.EXE - set value leaderboard</title>
+    <link rel="stylesheet" href="css/win98.css">
+    <link rel="stylesheet" href="css/retro-screen.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<div class="desktop">
+
+    <!-- ============================================================ -->
+    <!-- MAIN WINDOW -->
+    <!-- ============================================================ -->
+    <div class="window" style="max-width: 1400px; margin: 0 auto;">
+
+        <!-- Title bar -->
+        <div class="window-title">
+            <span class="window-title-text">POKEMETRICS.EXE - Set Value Leaderboard</span>
+            <div class="window-controls">
+                <button class="window-btn">_</button>
+                <button class="window-btn">&square;</button>
+                <button class="window-btn">X</button>
+            </div>
+        </div>
+
+        <!-- Menu bar -->
+        <div class="menubar">
+            <a href="/" class="menu-item" style="font-weight:bold;">Leaderboard</a>
+            <a href="/card_leaderboard.html" class="menu-item">Cards</a>
+            <a href="/sealed_leaderboard.html" class="menu-item">Sealed</a>
+            <a href="/sets.html" class="menu-item">Sets</a>
+            <a href="/wishlist.html" class="menu-item">Wishlist</a>
+            <a href="/search.html" class="menu-item">Search</a>
+            <a href="/calculator.html" class="menu-item">Calculator</a>
+            <a href="/about.html" class="menu-item">Help</a>
+        </div>
+
+        <!-- Hero -->
+        <div class="window-body" style="border-bottom: 2px groove var(--win-surface);">
+            <div class="flex items-center justify-between">
+                <div class="hero-text">
+                    <div class="hero-title">best sets to rip leaderboard</div>
+                    <div class="hero-subtitle">
+                        tracks live card prices and pack costs by set to show which are more worth opening, and which to avoid.
+                        <span class="updated-badge" id="meta"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Body: 2x2 grid of leaderboards -->
+        <div class="window-body">
+            <div class="grid-2">
+
+                <!-- ====== TABLE A: Best Bang for Buck ====== -->
+                <div class="window">
+                    <div class="window-title" style="background: linear-gradient(90deg, #800000, #c04040);">
+                        <span class="window-title-text">C:\BEST_BANG_FOR_BUCK.DAT</span>
+                    </div>
+                    <div class="section-explainer">
+                        how much on avg you <b>LOSE PER PACK</b>, including raw card values
+                    </div>
+                    <div class="window-body-flush">
+                        <div class="table-scroll">
+                            <table class="win-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width:40px">#</th>
+                                        <th>SET</th>
+                                        <th>FINAL RIP COST</th>
+                                        <th>TREND</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-gl">
+                                    <tr><td colspan="4" style="text-align:center;color:#808080;">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ====== TABLE B: Highest Raw Value Per Pack ====== -->
+                <div class="window">
+                    <div class="window-title" style="background: linear-gradient(90deg, #006400, #40a040);">
+                        <span class="window-title-text">C:\RAW_VALUE_PER_PACK.DAT</span>
+                    </div>
+                    <div class="section-explainer">
+                        current <b>PER PACK VALUE</b> based on avg card values and pull-rates
+                    </div>
+                    <div class="window-body-flush">
+                        <div class="table-scroll">
+                            <table class="win-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width:40px">#</th>
+                                        <th>SET</th>
+                                        <th>PACK RIP VALUE</th>
+                                        <th>TREND</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-ev">
+                                    <tr><td colspan="4" style="text-align:center;color:#808080;">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ====== TABLE C: Total Set Raw Value ====== -->
+                <div class="window">
+                    <div class="window-title" style="background: linear-gradient(90deg, #4b0082, #8040c0);">
+                        <span class="window-title-text">C:\TOTAL_SET_VALUE.DAT</span>
+                    </div>
+                    <div class="section-explainer">
+                        current <b>TOTAL SET VALUE</b> of all hits in set. Does not include pull odds. Just raw value.
+                    </div>
+                    <div class="window-body-flush">
+                        <div class="table-scroll">
+                            <table class="win-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width:40px">#</th>
+                                        <th>SET</th>
+                                        <th>TOTAL RAW VALUE</th>
+                                        <th>TREND</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-sv">
+                                    <tr><td colspan="4" style="text-align:center;color:#808080;">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ====== TABLE D: PSA Gem Rate ====== -->
+                <div class="window">
+                    <div class="window-title" style="background: linear-gradient(90deg, #8b6914, #c0a040);">
+                        <span class="window-title-text">C:\PSA_GEM_RATE.DAT</span>
+                    </div>
+                    <div class="section-explainer">
+                        current <b>AVG GEM RATE %</b> of all hits in set. PSA 10 cards / total graded DoubleRare+ cards.
+                    </div>
+                    <div class="window-body-flush">
+                        <div class="table-scroll">
+                            <table class="win-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width:40px">#</th>
+                                        <th>SET</th>
+                                        <th>GEM %</th>
+                                        <th>PSA 10 POP</th>
+                                        <th>TOTAL POP</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-gp">
+                                    <tr><td colspan="5" style="text-align:center;color:#808080;">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div><!-- /grid-2 -->
+        </div><!-- /window-body -->
+
+        <!-- Status bar -->
+        <div class="statusbar">
+            <div class="statusbar-field" id="status-msg">Ready</div>
+            <div class="statusbar-field" style="flex:1">20 sets tracked</div>
+            <div class="statusbar-field" style="flex:1" id="status-cards">8,617 cards</div>
+        </div>
+
+    </div><!-- /window -->
+
+</div><!-- /desktop -->
+
+<!-- ============================================================ -->
+<!-- TASKBAR -->
+<!-- ============================================================ -->
+<div class="taskbar">
+    <button class="start-btn">
+        <span style="font-size:14px;">&#9733;</span> Start
+    </button>
+    <div class="taskbar-divider"></div>
+    <button class="taskbar-task active">POKEMETRICS.EXE</button>
+    <div class="taskbar-clock" id="clock"></div>
+</div>
+
+<script src="js/leaderboard.js"></script>
+<script>
+// Clock
+function updateClock() {
+    const now = new Date();
+    const h = now.getHours();
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    document.getElementById('clock').textContent = `${h % 12 || 12}:${m} ${ampm}`;
+}
+updateClock();
+setInterval(updateClock, 60000);
+</script>
+
+</body>
+</html>

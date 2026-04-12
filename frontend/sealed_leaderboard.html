@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SEALED_PRODUCTS.EXE - sealed value leaderboard</title>
+    <link rel="stylesheet" href="css/win98.css">
+    <link rel="stylesheet" href="css/retro-screen.css">
+</head>
+<body>
+
+<div class="desktop">
+
+    <!-- MAIN WINDOW -->
+    <div class="window" style="max-width: 1400px; margin: 0 auto;">
+
+        <!-- Title bar -->
+        <div class="window-title">
+            <span class="window-title-text">SEALED_PRODUCTS.EXE - Sealed Value Leaderboard</span>
+            <div class="window-controls">
+                <button class="window-btn">_</button>
+                <button class="window-btn">&square;</button>
+                <button class="window-btn">X</button>
+            </div>
+        </div>
+
+        <!-- Menu bar -->
+        <div class="menubar">
+            <a href="/" class="menu-item">Leaderboard</a>
+            <a href="/card_leaderboard.html" class="menu-item">Cards</a>
+            <a href="/sealed_leaderboard.html" class="menu-item" style="font-weight:bold;">Sealed</a>
+            <a href="/sets.html" class="menu-item">Sets</a>
+            <a href="/wishlist.html" class="menu-item">Wishlist</a>
+            <a href="/search.html" class="menu-item">Search</a>
+            <a href="/calculator.html" class="menu-item">Calculator</a>
+            <a href="/about.html" class="menu-item">Help</a>
+        </div>
+
+        <!-- Hero -->
+        <div class="window-body" style="border-bottom: 2px groove var(--win-surface);">
+            <div class="flex items-center justify-between">
+                <div class="hero-text">
+                    <div class="hero-title">sealed product leaderboard</div>
+                    <div class="hero-subtitle">
+                        sealed products ranked by current market price, grouped by product type.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sealed groups rendered here -->
+        <div class="window-body" id="sealed-container">
+            <div style="text-align:center;color:#808080;padding:20px;">Loading sealed data...</div>
+        </div>
+
+        <!-- Status bar -->
+        <div class="statusbar">
+            <div class="statusbar-field" id="status-msg">Ready</div>
+            <div class="statusbar-field" style="flex:1" id="status-count">0 products</div>
+        </div>
+
+    </div><!-- /window -->
+
+</div><!-- /desktop -->
+
+<!-- TASKBAR -->
+<div class="taskbar">
+    <button class="start-btn">
+        <span style="font-size:14px;">&#9733;</span> Start
+    </button>
+    <div class="taskbar-divider"></div>
+    <button class="taskbar-task active">SEALED_PRODUCTS.EXE</button>
+    <div class="taskbar-clock" id="clock"></div>
+</div>
+
+<script src="js/sealed_leaderboard.js"></script>
+<script>
+function updateClock() {
+    const now = new Date();
+    const h = now.getHours();
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    document.getElementById('clock').textContent = `${h % 12 || 12}:${m} ${ampm}`;
+}
+updateClock();
+setInterval(updateClock, 60000);
+</script>
+
+</body>
+</html>

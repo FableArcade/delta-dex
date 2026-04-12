@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OPPORTUNITY_FINDER.EXE - undervalued &amp; overvalued cards</title>
+    <link rel="stylesheet" href="css/win98.css">
+    <link rel="stylesheet" href="css/retro-screen.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+    <style>
+        /* --- Opportunity Finder page --- */
+
+        .opp-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            padding: 8px 12px;
+            border-bottom: 2px groove var(--win-surface);
+            background: var(--win-surface);
+        }
+        .opp-tabs {
+            display: flex;
+            gap: 2px;
+        }
+        .opp-tab {
+            height: 26px;
+            padding: 0 14px;
+            background: var(--win-surface);
+            box-shadow: var(--bevel-raised);
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .opp-tab.active {
+            box-shadow: var(--bevel-sunken);
+            background: #dfdfdf;
+        }
+        .opp-tab.holds.active        { color: #003388; }
+        .opp-tab.mustbuy.active      { color: #806000; background: #fff6d8; }
+        .opp-tab.topchase.active     { color: #800040; background: #ffe4f0; }
+        .opp-tab.demandsurge.active  { color: #004080; background: #e4f0ff; }
+        .opp-tab.bestgrading.active  { color: #006400; background: #e8ffe8; }
+        .opp-tab.mustbuy,
+        .opp-tab.topchase,
+        .opp-tab.demandsurge,
+        .opp-tab.bestgrading         { font-weight: bold; }
+
+        .opp-controls-ev,
+        .opp-controls-holds,
+        .opp-controls-mustbuy,
+        .opp-controls-sentiment {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            flex: 1;
+        }
+
+        /* Dual-handle range slider (native two-input technique).
+           Stack two <input type="range"> absolutely and use pointer-events
+           to only forward clicks to the thumbs, not the tracks. The fill
+           bar between the two handles is drawn as a separate absolute div
+           whose left/width are updated by the wiring JS. */
+        .range-slider {
+            position: relative;
+            width: 240px;
+            height: 28px;
+            margin-right: 4px;
+        }
+        .range-slider .range-track,
+        .range-slider .range-fill {
+            position: absolute;
+            top: 12px;
+            height: 4px;
+            pointer-events: none;
+        }
+        .range-slider .range-track {
+            left: 0;
+            right: 0;
+            background: #b8b8b8;
+            box-shadow: var(--bevel-sunken);
+        }
+        .range-slider .range-fill {
+            background: #006080;
+        }
+        .range-slider input[type="range"] {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 28px;
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            -webkit-appearance: none;
+            appearance: none;
+            pointer-events: none;  /* lets track + fill be inert */
+        }
+        .range-slider input[type="range"]::-webkit-slider-thumb {
+            pointer-events: auto;    /* but the thumbs ARE draggable */
+            -webkit-appearance: none;
+            width: 14px;
+            height: 18px;
+            background: var(--win-surface);
+            border: 1px solid #000;
+            border-radius: 0;
+            cursor: grab;
+            box-shadow: var(--bevel-raised);
+            margin-top: 0;
+        }
+        .range-slider input[type="range"]::-moz-range-thumb {
+            pointer-events: auto;
+            width: 14px;
+            height: 18px;
+            background: var(--win-surface);
+            border: 1px solid #000;
+            border-radius: 0;
+            cursor: grab;
+            box-shadow: var(--bevel-raised);
+        }
+        .range-slider input[type="range"]::-webkit-slider-thumb:active { cursor: grabbing; }
+        .range-slider input[type="range"]::-moz-range-thumb:active { cursor: grabbing; }
+        .range-slider input[type="range"]::-webkit-slider-runnable-track {
+            background: transparent;
+            height: 4px;
+        }
+
+        /* Per-cell hover tooltip — used to expose Must Buy Now component
+           breakdown when hovering the score chip. CSS-only, multi-line. */
+        [data-tip] {
+            position: relative;
+        }
+        [data-tip]::after {
+            content: attr(data-tip);
+            position: absolute;
+            right: 0;
+            bottom: calc(100% + 4px);
+            min-width: 220px;
+            max-width: 320px;
+            padding: 8px 10px;
+            font-size: 11px;
+            font-weight: normal;
+            font-family: 'Tahoma', 'MS Sans Serif', sans-serif;
+            text-transform: none;
+            line-height: 1.45;
+            text-align: left;
+            color: #000;
+            background: #ffffe1;
+            border: 1px solid #000;
+            box-shadow: 2px 2px 0 rgba(0,0,0,0.25);
+            white-space: pre-line;
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(4px);
+            transition: opacity 0.08s ease-out, transform 0.08s ease-out;
+            z-index: 1000;
+        }
+        [data-tip]:hover::after {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Must-buy score chip — amber tiers */
+        .mb-chip {
+            display: inline-block;
+            min-width: 48px;
+            padding: 2px 8px;
+            font-size: 12px;
+            font-weight: bold;
+            font-variant-numeric: tabular-nums;
+            text-align: center;
+            box-shadow: var(--bevel-raised);
+        }
+        .mb-chip.tier-strong  { background: #c8ffc8; color: #004000; }  /* 75+ */
+        .mb-chip.tier-solid   { background: #ffe8a0; color: #5a4000; }  /* 60-74 */
+        .mb-chip.tier-weak    { background: #e8e8e8; color: #606060; }  /* <60 */
+
+        .opp-control {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+        }
+        .opp-control label {
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #404040;
+        }
+        .opp-control input[type="range"] {
+            width: 110px;
+        }
+        .opp-control input[type="number"] {
+            width: 60px;
+            height: 22px;
+            border: none;
+            box-shadow: var(--bevel-sunken);
+            background: var(--win-white);
+            padding: 2px 4px;
+            font-family: inherit;
+            font-size: 11px;
+        }
+        .opp-formula-note {
+            margin-left: auto;
+            font-size: 10px;
+            color: #606060;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Score chip in the table */
+        .ev-chip {
+            display: inline-block;
+            min-width: 64px;
+            padding: 2px 8px;
+            font-size: 12px;
+            font-weight: bold;
+            font-variant-numeric: tabular-nums;
+            text-align: right;
+            box-shadow: var(--bevel-raised);
+        }
+        .ev-chip.pos   { background: #c8ffc8; color: #004000; }
+        .ev-chip.neg   { background: #ffc8c8; color: #550000; }
+        .ev-chip.zero  { background: #e8e8e8; color: #404040; }
+
+        .gem-inline {
+            font-variant-numeric: tabular-nums;
+        }
+        .gem-inline.est {
+            color: #808080;
+            font-style: italic;
+        }
+        /* Best Grading Play: dim color for assumed (default) gem rates so the
+           user can tell at a glance which rows have real PSA pop data. */
+        .gem-assumed {
+            color: #909090;
+            font-style: italic;
+        }
+        /* Long-Term Holds: anchor window badge (90d = real conviction,
+           30d = thin data fallback). Dimmed for 30d so the user can see
+           which rows are built on less history. */
+        .anchor-badge {
+            display: inline-block;
+            padding: 1px 5px;
+            border: 1px solid #808080;
+            background: #e8e8e8;
+            font-size: 9px;
+            font-weight: bold;
+            font-family: Tahoma, sans-serif;
+            color: #404040;
+        }
+        .anchor-badge.anchor-90d { background: #c8e8ff; color: #003060; border-color: #4080c0; }
+        .anchor-badge.anchor-30d { background: #f8e8c8; color: #604000; border-color: #c08040; font-style: italic; }
+
+        /* Distribution chart (below the table) */
+        .dist-chart-box {
+            border-top: 2px groove var(--win-surface);
+            background: #f3f3f3;
+            padding: 10px 14px 14px;
+        }
+        .dist-chart-title {
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #404040;
+            margin-bottom: 6px;
+        }
+        .dist-chart-sub {
+            font-size: 10px;
+            color: #707070;
+            margin-bottom: 8px;
+        }
+        .dist-chart-wrap {
+            position: relative;
+            height: 340px;
+            box-shadow: var(--bevel-sunken);
+            background: var(--win-white);
+            padding: 4px;
+        }
+        .dist-chart-wrap canvas { width: 100% !important; height: 100% !important; }
+        .opp-philosophy {
+            font-size: 11px;
+            font-weight: bold;
+            color: #404040;
+            padding: 2px 8px;
+            background: #f0f0f8;
+            border: 1px solid #c0c0c0;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+
+<div class="desktop">
+
+    <!-- MAIN WINDOW -->
+    <div class="window" style="max-width: 1400px; margin: 0 auto;">
+
+        <!-- Title bar -->
+        <div class="window-title">
+            <span class="window-title-text">OPPORTUNITY_FINDER.EXE - Undervalued &amp; Overvalued Cards</span>
+            <div class="window-controls">
+                <button class="window-btn">_</button>
+                <button class="window-btn">&square;</button>
+                <button class="window-btn">X</button>
+            </div>
+        </div>
+
+        <!-- Menu bar -->
+        <div class="menubar">
+            <a href="/" class="menu-item">Leaderboard</a>
+            <a href="/card_leaderboard.html" class="menu-item" style="font-weight:bold;">Cards</a>
+            <a href="/sealed_leaderboard.html" class="menu-item">Sealed</a>
+            <a href="/sets.html" class="menu-item">Sets</a>
+            <a href="/wishlist.html" class="menu-item">Wishlist</a>
+            <a href="/search.html" class="menu-item">Search</a>
+            <a href="/calculator.html" class="menu-item">Calculator</a>
+            <a href="/about.html" class="menu-item">Help</a>
+        </div>
+
+        <!-- Hero -->
+        <div class="window-body" style="border-bottom: 2px groove var(--win-surface);">
+            <div class="flex items-center justify-between">
+                <div class="hero-text">
+                    <div class="hero-title">opportunity finder</div>
+                    <div class="hero-subtitle">
+                        composite conviction scoring across grading math, market sentiment, scarcity &amp; momentum.
+                        start at <b>Must Buy Now</b> for strongest picks, or drill into specific frames with the other tabs.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toolbar: tabs + controls -->
+        <div class="opp-toolbar">
+            <div class="opp-tabs">
+                <button class="opp-tab mustbuy active"    data-view="mustbuy">&#9889; Must Buy Now</button>
+                <button class="opp-tab topchase"          data-view="topchase">&#128293; Top Chase</button>
+                <button class="opp-tab demandsurge"       data-view="demandsurge">&#128200; Demand Surge</button>
+                <button class="opp-tab bestgrading"       data-view="bestgrading">&#128142; Best Grading Play</button>
+                <button class="opp-tab holds"             data-view="holds">Long-Term Holds</button>
+            </div>
+
+            <!-- Controls specific to Demand Surge view -->
+            <div class="opp-controls-demandsurge" style="display:none;">
+                <div class="opp-control" title="Only show cards whose PSA 10 price is at least this much.">
+                    <label for="ds-min-psa10">Min PSA 10 $</label>
+                    <input type="number" id="ds-min-psa10" min="0" max="10000" step="25" value="100">
+                </div>
+                <div class="opp-control" title="Minimum normalized net flow: daily listings absorbed as a fraction of the active pool. Real-data range is 0 to ~4% — 1% daily = ~7% weekly pool clearance = credible surge. 2% = strong. 3%+ = rare max-drain.">
+                    <label for="ds-min-nfpct">Min net flow %</label>
+                    <input type="range" id="ds-min-nfpct" min="0" max="0.04" step="0.002" value="0.010">
+                    <span id="ds-min-nfpct-val" style="font-weight:bold;min-width:42px;text-align:right;">+1.0%</span>
+                </div>
+                <span class="opp-philosophy">Flow screen: cards being absorbed faster than listed</span>
+                <span class="opp-formula-note">Gated on: daily net flow ≥ 1% of pool, supply saturation &lt; 1, demand/supply ratio ≥ 1.2×. Ranked by D/S ratio.</span>
+            </div>
+
+            <!-- Controls specific to Best Grading Play view -->
+            <div class="opp-controls-bestgrading" style="display:none;">
+                <div class="opp-control" title="Only show cards whose PSA 10 price is at least this much. Default $100 keeps the list investor-grade.">
+                    <label for="bg-min-psa10">Min PSA 10 $</label>
+                    <input type="number" id="bg-min-psa10" min="0" max="10000" step="25" value="100">
+                </div>
+                <div class="opp-control" title="Minimum raw price. Default $30 — below that, the $25 grading fee dominates cost basis and the math turns into a lottery ticket.">
+                    <label for="bg-min-raw">Min raw $</label>
+                    <input type="number" id="bg-min-raw" min="0" max="2000" step="1" value="30">
+                </div>
+                <span class="opp-philosophy">Grading ROI: expected profit from raw → PSA 10</span>
+                <span class="opp-formula-note">Real EV: <code>gem%&nbsp;×&nbsp;PSA10 + p9&nbsp;×&nbsp;PSA9 + p8&nbsp;×&nbsp;PSA8 − $25 fee − raw</code>. Only cards with EV&nbsp;&gt;&nbsp;0 shown. <code>~</code> on gem% = PSA pop data missing (conservative 10% assumed).</span>
+            </div>
+
+            <!-- Controls specific to Must Buy Now view (smart-investor composite) -->
+            <div class="opp-controls-mustbuy">
+                <div class="opp-control" title="Minimum smart-investor score. 50 = solid pick, 65 = strong conviction, 75+ = high conviction.">
+                    <label for="mustbuy-min-score">Min score</label>
+                    <input type="range" id="mustbuy-min-score" min="0" max="100" step="5" value="50">
+                    <span id="mustbuy-min-score-val" style="font-weight:bold;min-width:28px;text-align:right;">50</span>
+                </div>
+                <span class="opp-philosophy">Composite conviction: strongest overall picks</span>
+                <span class="opp-formula-note">Score = 15% culture + 25% demand (normalized net flow %) + 25% real scarcity (pop + supply tightness + 12mo price stability) + 15% momentum + 20% grading (real EV, not ratio) &middot; cards with no cultural moat, no market data, or saturated supply are excluded</span>
+            </div>
+
+            <!-- Controls specific to Top Chase view -->
+            <div class="opp-controls-topchase" style="display:none;">
+                <div class="opp-control" title="Minimum PSA 10 price for chase tier. Lower = bigger list. Default $200.">
+                    <label for="topchase-min-psa10">Min PSA 10 $</label>
+                    <input type="number" id="topchase-min-psa10" min="0" max="20000" step="25" value="200">
+                </div>
+                <span class="opp-philosophy">Grail tracker: expensive cards with active demand</span>
+                <span class="opp-formula-note">Chase = <code>√(psa10/100) × (1 + nf30% × 2) × (1 + cultural × 0.8)</code>. Rewards expensive grails, normalized demand, and iconic names (no listing-count bias).</span>
+            </div>
+
+            <!-- Controls specific to Long-Term Holds view -->
+            <div class="opp-controls-holds" style="display:none;">
+                <div class="opp-control" title="Which kind of long-term holdable to show.">
+                    <label for="hold-type">Type</label>
+                    <select id="hold-type" style="height:22px;border:none;box-shadow:var(--bevel-sunken);background:var(--win-white);padding:2px 4px;font-family:inherit;font-size:11px;">
+                        <option value="both" selected>Sealed + PSA 10</option>
+                        <option value="sealed">Sealed only</option>
+                        <option value="psa10">PSA 10 only</option>
+                    </select>
+                </div>
+
+                <div class="opp-control" title="Minimum days of price history required. Cards with less history get filtered out since momentum is unreliable on thin data.">
+                    <label for="min-history-input">Min history (days)</label>
+                    <input type="number" id="min-history-input" min="0" max="365" step="5" value="60">
+                </div>
+
+                <div class="opp-control" title="Hide holds cheaper than this (filters out penny products). Default $200 focuses on investor-grade products.">
+                    <label for="min-hold-input">Min price $</label>
+                    <input type="number" id="min-hold-input" min="0" max="5000" step="25" value="200">
+                </div>
+
+                <span class="opp-philosophy">Momentum screen: confirmed uptrends with value-trap protection</span>
+                <span class="opp-formula-note">Hold Score = momentum × (1 + <em>capped</em> peak discount). Peak-discount cap 50% (value-trap guard). Gates: momentum ≥ 3%, current ≥ 1.3× 1yr low (confirmed bottom), min history days. Singles also need cultural ≥ 0.20, bullish net flow, non-saturated supply. Sealed needs hold score ≥ 8%. Badge shows anchor window: <span class="anchor-badge anchor-90d">90d</span> real / <span class="anchor-badge anchor-30d">30d</span> thin.</span>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="window-body-flush">
+            <div class="win-table-wrap">
+                <div class="table-scroll" style="max-height: 70vh;">
+                    <table class="win-table" id="card-table">
+                        <thead id="card-thead">
+                            <!-- Populated dynamically by js/card_leaderboard.js based on view -->
+                        </thead>
+                        <tbody id="card-tbody">
+                            <tr><td colspan="10" style="text-align:center;color:#808080;">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Load More -->
+        <div class="window-body" style="text-align:center; padding: 8px;">
+            <button class="btn btn-primary" id="load-more-btn" style="display:none;">Load More Cards</button>
+        </div>
+
+        <!-- Distribution chart: curved plot of the current filtered list, ranked by score -->
+        <div class="dist-chart-box">
+            <div class="dist-chart-title" id="dist-chart-title">Opportunity distribution</div>
+            <div class="dist-chart-sub" id="dist-chart-sub">Each card in the current filter is plotted on the curve. Green above zero = undervalued. Red below zero = overvalued.</div>
+            <div class="dist-chart-wrap">
+                <canvas id="dist-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- Status bar -->
+        <div class="statusbar">
+            <div class="statusbar-field" id="status-msg">Ready</div>
+            <div class="statusbar-field" style="flex:1" id="status-count">0 cards</div>
+        </div>
+
+    </div><!-- /window -->
+
+</div><!-- /desktop -->
+
+<!-- TASKBAR -->
+<div class="taskbar">
+    <button class="start-btn">
+        <span style="font-size:14px;">&#9733;</span> Start
+    </button>
+    <div class="taskbar-divider"></div>
+    <button class="taskbar-task active">CARD_LEADERBOARD.EXE</button>
+    <div class="taskbar-clock" id="clock"></div>
+</div>
+
+<script src="js/card_leaderboard.js"></script>
+<script>
+function updateClock() {
+    const now = new Date();
+    const h = now.getHours();
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    document.getElementById('clock').textContent = `${h % 12 || 12}:${m} ${ampm}`;
+}
+updateClock();
+setInterval(updateClock, 60000);
+</script>
+
+</body>
+</html>

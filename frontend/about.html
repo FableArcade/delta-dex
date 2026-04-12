@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HELP.EXE - methodology & investor playbook</title>
+    <link rel="stylesheet" href="css/win98.css">
+    <link rel="stylesheet" href="css/retro-screen.css">
+    <style>
+        .help-body {
+            padding: 16px 24px;
+            max-width: 880px;
+            margin: 0 auto;
+            font-family: 'Tahoma', 'MS Sans Serif', sans-serif;
+        }
+
+        .help-body h2 {
+            font-size: 18px;
+            margin-top: 28px;
+            margin-bottom: 8px;
+            padding-bottom: 4px;
+            border-bottom: 2px solid var(--win-text);
+        }
+
+        .help-body h3 {
+            font-size: 14px;
+            margin-top: 16px;
+            margin-bottom: 4px;
+            color: #003388;
+        }
+
+        .help-body h4 {
+            font-size: 12px;
+            margin-top: 10px;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            color: #555;
+            letter-spacing: 0.5px;
+        }
+
+        .help-body p {
+            font-size: 12px;
+            line-height: 1.55;
+            margin: 6px 0 10px;
+        }
+
+        .help-body ul, .help-body ol {
+            font-size: 12px;
+            line-height: 1.55;
+            margin: 4px 0 12px 0;
+            padding-left: 22px;
+        }
+        .help-body li { margin: 3px 0; }
+
+        .help-body code {
+            background: #ffffe1;
+            border: 1px solid #c0c0a0;
+            padding: 1px 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+        }
+
+        .help-body pre {
+            background: #ffffe1;
+            border: 1px solid #c0c0a0;
+            padding: 8px 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            overflow-x: auto;
+            margin: 8px 0;
+            line-height: 1.4;
+        }
+
+        .help-body strong { color: #000; }
+
+        .help-callout {
+            background: #fff6d8;
+            border: 1px solid #c0a060;
+            padding: 8px 12px;
+            margin: 12px 0;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .help-callout-warn {
+            background: #ffe8e8;
+            border-color: #c06060;
+        }
+        .help-callout-tip {
+            background: #e8ffe8;
+            border-color: #60a060;
+        }
+
+        .help-callout-title {
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 10px;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+            color: #806000;
+        }
+        .help-callout-warn .help-callout-title { color: #800000; }
+        .help-callout-tip .help-callout-title { color: #006000; }
+
+        .help-toc {
+            background: #f3f3f3;
+            border: 2px groove var(--win-surface);
+            padding: 12px 18px;
+            margin: 12px 0 24px;
+            font-size: 12px;
+        }
+        .help-toc-title {
+            font-weight: bold;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            font-size: 11px;
+        }
+        .help-toc ul {
+            margin: 0;
+            padding-left: 20px;
+            list-style-type: square;
+        }
+        .help-toc a {
+            color: var(--win-link);
+            text-decoration: none;
+        }
+        .help-toc a:hover { text-decoration: underline; }
+
+        .formula-box {
+            background: #f0f0f8;
+            border: 1px solid #8090b0;
+            padding: 8px 12px;
+            margin: 8px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
+        table.glossary {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin: 8px 0;
+        }
+        table.glossary td, table.glossary th {
+            border: 1px solid #c0c0c0;
+            padding: 6px 8px;
+            vertical-align: top;
+        }
+        table.glossary th {
+            background: #d4d0c8;
+            text-align: left;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+        table.glossary tr:nth-child(even) td { background: #f8f8f8; }
+        table.glossary td:first-child {
+            font-weight: bold;
+            white-space: nowrap;
+            width: 1%;
+        }
+    </style>
+</head>
+<body>
+
+<div class="desktop">
+
+    <div class="window" style="max-width: 1000px; margin: 0 auto;">
+
+        <!-- Title bar -->
+        <div class="window-title">
+            <span class="window-title-text">HELP.EXE - methodology &amp; investor playbook</span>
+            <div class="window-controls">
+                <button class="window-btn">_</button>
+                <button class="window-btn">&square;</button>
+                <button class="window-btn">X</button>
+            </div>
+        </div>
+
+        <!-- Menu bar -->
+        <div class="menubar">
+            <a href="/" class="menu-item">Leaderboard</a>
+            <a href="/card_leaderboard.html" class="menu-item">Cards</a>
+            <a href="/sealed_leaderboard.html" class="menu-item">Sealed</a>
+            <a href="/sets.html" class="menu-item">Sets</a>
+            <a href="/wishlist.html" class="menu-item">Wishlist</a>
+            <a href="/search.html" class="menu-item">Search</a>
+            <a href="/calculator.html" class="menu-item">Calculator</a>
+            <a href="/about.html" class="menu-item" style="font-weight:bold;">Help</a>
+        </div>
+
+        <div class="help-body">
+
+            <h1 style="font-size:24px;margin-bottom:4px;">Pokemon TCG Investor Methodology</h1>
+            <p style="color:#555;font-size:12px;font-style:italic;">A practical guide for investors who want to use data to find under- and overvalued cards. No fluff, no jargon. Every concept is explained the way you'd want a friend who's already in the market to explain it to you.</p>
+
+            <div class="help-toc">
+                <div class="help-toc-title">In this guide</div>
+                <ul>
+                    <li><a href="#thesis">1. The investing thesis — why Pokemon cards behave like assets</a></li>
+                    <li><a href="#vocabulary">2. Vocabulary you need to know</a></li>
+                    <li><a href="#mustbuy">3. ⚡ Must Buy Now — the smart investor's screen</a></li>
+                    <li><a href="#topchase">4. 🔥 Top Chase — high-value cards with active demand</a></li>
+                    <li><a href="#demandsurge">5. 📈 Demand Surge — pure net flow ranking</a></li>
+                    <li><a href="#bestgrading">6. 💎 Best Grading Play — % uplift</a></li>
+                    <li><a href="#holds">7. Long-Term Holds — momentum + dip-buying for sealed and PSA 10s</a></li>
+                    <li><a href="#sets">8. Sets page — explore set-level economics</a></li>
+                    <li><a href="#sealed">9. Sealed page — booster boxes, ETBs, bundles</a></li>
+                    <li><a href="#calculator">10. Calculator — pack ripping math</a></li>
+                    <li><a href="#carddetail">11. Card detail page — drilling into a single card</a></li>
+                    <li><a href="#playbook">12. The investor's playbook — how to combine tabs</a></li>
+                    <li><a href="#warnings">13. Risks &amp; signal limitations</a></li>
+                </ul>
+            </div>
+
+            <!-- ================================================== -->
+            <h2 id="thesis">1. The investing thesis</h2>
+
+            <p>Pokemon TCG cards are <strong>collectible assets with a price discovery mechanism</strong>. Like any market, prices reflect the intersection of supply and demand &mdash; but unlike stocks, the supply of any specific printed card is essentially fixed once a set leaves print. That means demand is the bigger lever, and demand for Pokemon cards is driven by:</p>
+
+            <ul>
+                <li><strong>Cultural impact</strong> &mdash; a Charizard will always have a buyer; an obscure trainer card might not.</li>
+                <li><strong>Grading scarcity</strong> &mdash; PSA 10 graded copies are rarer than raw, and the price gap between raw and PSA 10 is the grading arbitrage.</li>
+                <li><strong>Set rotation &amp; print runs</strong> &mdash; sealed product gets ripped, supply shrinks, prices drift up over time.</li>
+                <li><strong>Market sentiment</strong> &mdash; what people are listing, buying, hoarding, or dumping right now.</li>
+            </ul>
+
+            <p>This dashboard pulls every metric from those four buckets and surfaces the cards where the signals line up. Your job as an investor is to know what each metric measures, what it doesn't, and how to combine them.</p>
+
+            <div class="help-callout help-callout-tip">
+                <div class="help-callout-title">Mental model</div>
+                Think of every card as a tiny equity. Raw price is the "common stock," PSA 10 is the "preferred share with a higher floor." Sealed booster boxes are "index funds" &mdash; broad exposure to a set's appreciation. Your job is to find mispriced ones by reading the order book (eBay listings + sales) and the float (PSA population).
+            </div>
+
+            <!-- ================================================== -->
+            <h2 id="vocabulary">2. Vocabulary</h2>
+
+            <table class="glossary">
+                <tr><th>Term</th><th>What it means</th></tr>
+                <tr><td>Raw price</td><td>The current ungraded market price for a single copy. The cheapest entry point.</td></tr>
+                <tr><td>PSA 10 price</td><td>The current market price for a PSA 10 (gem mint) graded copy. The ceiling.</td></tr>
+                <tr><td>Gem rate</td><td>The historical % of submissions that come back as PSA 10 for this specific card. A 70% gem rate means roughly 7 of every 10 graded copies hit gem mint. Better print quality &rarr; higher gem rate &rarr; better grading EV.</td></tr>
+                <tr><td>PSA 10 population</td><td>Total all-time count of PSA 10 graded copies. Lower number = rarer in top grade = higher PSA 10 premium.</td></tr>
+                <tr><td>Net flow</td><td>Demand pressure minus supply pressure over a window. Positive = more buyers than sellers (bullish). Negative = more sellers than buyers (bearish). Range typically -5 to +5; anything above +2 is strong buying.</td></tr>
+                <tr><td>Demand pressure</td><td>How actively people are buying this card on eBay. Computed from sold listings.</td></tr>
+                <tr><td>Supply pressure</td><td>How actively people are listing this card. Computed from new listings.</td></tr>
+                <tr><td>Supply saturation index</td><td>Current active listings vs. this card's normal baseline. <code>1.0</code> = normal, <code>&lt;1</code> = tighter than usual (good for holders), <code>&gt;1</code> = flooded (bad for holders).</td></tr>
+                <tr><td>Listings Δ</td><td>% change in active eBay listings recently. Negative = supply drying up (great signal), positive = more sellers piling in (bad signal).</td></tr>
+                <tr><td>Premium %</td><td><code>(PSA 10 price − raw price) / raw price × 100</code>. The grading multiplier expressed as a percentage. A 1000% premium means PSA 10 sells for 10× raw.</td></tr>
+                <tr><td>Grading EV</td><td>Expected profit per card if you buy raw and submit for grading. Formula: <code>gem_rate × psa10_price − $25 grading fee − raw_price</code>. Positive = grading is profitable, negative = don't grade.</td></tr>
+                <tr><td>Hold score</td><td>For long-term holds: <code>90d momentum × (1 + peak discount)</code>. Rewards cards that are appreciating AND currently below their peak.</td></tr>
+            </table>
+
+            <!-- ================================================== -->
+            <h2 id="mustbuy">3. ⚡ Must Buy Now</h2>
+
+            <p>This is the <strong>smart investor's screen</strong>. It blends six independent signal dimensions into a single 0&ndash;100 conviction score. A real investor doesn't bet on one signal &mdash; they bet on multi-factor agreement. Must Buy Now is that, distilled into a sortable list.</p>
+
+            <h3>The formula</h3>
+            <div class="formula-box">
+Score (0–100) =
+    15% × Cultural Impact     iconic Pokemon names + chase rarity
+  + 25% × Demand Momentum     7d nf + 30d nf + demand/supply ratio
+  + 25% × Real Scarcity       lifetime PSA pop + current supply tightness + listings drying
+  + 15% × PSA 10 Momentum     trajectory: rising / rebound / flat / falling
+  + 20% × Grading Value       PSA 10 / Raw multiple + real gem rate</div>
+
+            <h3>Hard gates (must pass)</h3>
+            <ul>
+                <li><strong>Singles only</strong> &mdash; sealed products use the Long-Term Holds tab instead.</li>
+                <li><strong>PSA 10 price &gt; $20</strong> &mdash; penny cards aren't investable.</li>
+                <li><strong>Has at least one of:</strong> 30-day net flow, supply saturation, listings delta &mdash; we need real market data, not defaults.</li>
+                <li><strong>Supply saturation index &lt; 1</strong> &mdash; current listings must be below baseline. A flooded market can't be a "must buy now" no matter how bullish the other signals are.</li>
+            </ul>
+
+            <h3>How to read each dimension</h3>
+
+            <h4>Cultural impact (15%)</h4>
+            <p>A hardcoded score that reflects brand strength &mdash; Charizard, Pikachu, Mewtwo, Mew, Umbreon get the highest values. Iconic legendaries (Lugia, Rayquaza, Gengar) are tier A. Eeveelutions are tier B. Popular trainer characters (Cynthia, Lillie, Iono, Marnie) get a smaller bump. Rare card types (Special Illustration Rare, Hyper Rare, etc.) add a flat bonus on top. <strong>Why it matters</strong>: a Charizard at $X is safer than an obscure Pokemon at the same price because the demand floor exists no matter what. Cultural impact is the moat.</p>
+
+            <h4>Demand momentum (25%)</h4>
+            <p>Combines three signals: 7-day net flow, 30-day net flow, and the demand/supply ratio. We weight 7d and 30d equally (40% each) and use the ratio as a 20% confirmation. The reason we want both windows: a 1-week spike is noise, sustained 30-day buying is a real shift in market positioning. Cards that score high here are being actively accumulated by other buyers <em>right now</em>.</p>
+
+            <h4>Real Scarcity (25%)</h4>
+            <p>This is a <strong>merged</strong> metric that requires three sub-signals to agree before it scores high:</p>
+            <ul>
+                <li><strong>Lifetime PSA 10 population</strong> (25% of the scarcity weight) &mdash; how rare this card is in graded form, all-time</li>
+                <li><strong>Current supply tightness</strong> (45%) &mdash; the supply saturation index right now</li>
+                <li><strong>Listings drying</strong> (30%) &mdash; whether eBay listings are shrinking or growing</li>
+            </ul>
+            <p>If any sub-signal is below 30% (signals disagree), an alignment penalty drags the whole score down by ×0.6 to ×0.85. This prevents the most common false positive: a card with a tiny PSA 10 population (looks scarce!) but a flooded eBay (actually plenty of supply right now). Real scarcity requires lifetime <em>and</em> current <em>and</em> trend all pointing the same way.</p>
+
+            <h4>PSA 10 momentum (15%)</h4>
+            <p>Classifies the PSA 10 price trajectory using current vs. 30-day-ago vs. 90-day-ago snapshots:</p>
+            <ul>
+                <li><strong>Rising</strong> (cur &gt; 30d &gt; 90d): consistent uptrend, score 0.7–1.0</li>
+                <li><strong>Rebound</strong> (cur &gt; 30d, but 30d &le; 90d): bouncing off a recent dip, score 0.5–0.8 &mdash; mean-reversion entry</li>
+                <li><strong>Flat</strong> (within 2%): neutral, score 0.30</li>
+                <li><strong>Falling</strong>: score 0–0.30</li>
+            </ul>
+
+            <h4>Grading value (20%)</h4>
+            <p>Combines the raw-to-PSA-10 price multiple with the real gem rate. Sweet spot: a card with a 3–15× ratio AND a high gem rate (60%+). High ratio with low gem rate is a trap (you'll grade 100 cards and only 10 hit gem &mdash; you need volume to make the math work).</p>
+
+            <h3>How to use it</h3>
+            <ol>
+                <li><strong>Open Must Buy Now</strong> (it's the default view). Drag the Min Score slider down to 40 if you want a wider list, or up to 65+ for the highest-conviction picks.</li>
+                <li><strong>Hover any SCORE chip</strong> to see the per-card breakdown across all 5 dimensions. You'll see exactly which signals are firing and which are missing.</li>
+                <li><strong>Look for cards with all 4 dimension columns at 60+</strong> (Culture / Demand / Scarcity / Momentum). Those are the cards where every signal agrees.</li>
+                <li><strong>Don't blindly trust high-cultural cards</strong>. A Charizard with cultural=100 but demand=30 and scarcity=15 is overpriced. The other dimensions matter.</li>
+                <li><strong>Click any row</strong> to drill into the card detail page and see the full price history.</li>
+            </ol>
+
+            <div class="help-callout help-callout-tip">
+                <div class="help-callout-title">Investor's edge</div>
+                The interesting picks are often <em>not</em> the famous Pokemon. They're the obscure cards where the technicals (demand + scarcity + momentum) align so strongly that the cultural floor isn't needed. Those are the cards retail isn't watching yet.
+            </div>
+
+            <!-- ================================================== -->
+            <h2 id="topchase">4. 🔥 Top Chase</h2>
+
+            <p>This is where the famous chase Charizards / Mewtwos / Venusaurs surface. Filter is simple: <strong>PSA 10 price &ge; $200</strong> AND <strong>positive demand</strong> (net flow above the soft floor). Sort is a composite chase score that rewards three things together:</p>
+
+            <div class="formula-box">
+chase_score = log10(psa10_price)
+            × (1 + max(0, 30d_net_flow) / 2)
+            × (1 + cultural_impact × 0.3)</div>
+
+            <p>Higher PSA 10 price &rarr; higher base. Positive demand &rarr; multiplier. Iconic Pokemon name &rarr; brand boost. The result is a single number that ranks cards by "expensive AND wanted AND iconic." Plain price-only sorting would surface dead chase cards; the demand multiplier makes sure you only see cards being actively bought.</p>
+
+            <h3>How to use it</h3>
+            <ol>
+                <li><strong>Bump the Min PSA 10 $ slider up</strong> (e.g. $500 or $1000) to filter to only the marquee tier.</li>
+                <li><strong>Compare the demand and supply columns</strong>. A Charizard ex with demand 0.10 and supply 0.05 is being absorbed by the market 2× as fast as it's being listed.</li>
+                <li><strong>Look for price tier outliers</strong>: a $580 Venusaur ex with the same chase score as a $1,770 Charizard ex tells you the Venusaur is punching above its price (more demand per dollar of price).</li>
+            </ol>
+
+            <!-- ================================================== -->
+            <h2 id="demandsurge">5. 📈 Demand Surge</h2>
+
+            <p>Pure ranking by net flow. No composite, no cultural multiplier &mdash; just "which cards have the strongest current demand vs. supply." Use this when you want to see <strong>what the market is chasing right now</strong>, regardless of price tier or famous names.</p>
+
+            <h3>The columns</h3>
+            <ul>
+                <li><strong>Demand</strong> &mdash; raw demand pressure (sold listings velocity)</li>
+                <li><strong>Supply</strong> &mdash; raw supply pressure (new listings velocity)</li>
+                <li><strong>D/S Ratio</strong> &mdash; demand divided by supply. A ratio above 2.0 means buyers are outpacing sellers 2:1, which is rare and bullish.</li>
+                <li><strong>Net flow 30d</strong> &mdash; the aggregate signal, the column the table is sorted by.</li>
+            </ul>
+
+            <h3>How to use it</h3>
+            <ol>
+                <li><strong>Adjust Min Net Flow slider</strong>: default +0.5 catches anything mildly bullish, push it to +2 for only the strongest demand.</li>
+                <li><strong>Cross-reference with Top Chase</strong>: cards that appear in BOTH lists are "expensive AND surging" &mdash; the highest-conviction signals.</li>
+                <li><strong>Watch for D/S ratio &gt; 3</strong> &mdash; that's a market that has run out of sellers and is bidding the price up.</li>
+            </ol>
+
+            <!-- ================================================== -->
+            <h2 id="bestgrading">6. 💎 Best Grading Play</h2>
+
+            <p>The simplest screen: <strong>which cards have the biggest percentage premium between raw and PSA 10?</strong></p>
+
+            <div class="formula-box">
+premium_pct = (PSA 10 price − raw price) / raw price × 100
+multiplier  = PSA 10 price / raw price</div>
+
+            <p>This is a pure grading-arbitrage screen. No gem rate guesswork, no probability math &mdash; just the raw market multiplier. A card with a $5 raw and a $250 PSA 10 has a 4900% premium (50× multiplier). If you can grade it with a decent gem rate, the math is incredible.</p>
+
+            <h3>Caveats &mdash; this is the most "trap"-prone view</h3>
+            <ul>
+                <li><strong>The biggest premiums are stamped/promo variants</strong>. They have huge multiples because they're rarely graded, not because grading is profitable. Always check whether the PSA 10 sample size is meaningful.</li>
+                <li><strong>The premium doesn't account for gem rate</strong>. A 50× premium with a 5% gem rate gives you a real EV of <code>0.05 × 50 − 1 = 1.5×</code> &mdash; still good but not 50×.</li>
+                <li><strong>Liquidity matters</strong>. A $1,500 PSA 10 with one sale per year isn't a real market.</li>
+            </ul>
+
+            <h3>How to use it</h3>
+            <ol>
+                <li><strong>Set Min PSA 10 $ to $100+</strong> to filter out penny noise.</li>
+                <li><strong>Set Min raw $ to $5+</strong> &mdash; sub-$1 raw cards inflate the % premium with a tiny denominator.</li>
+                <li><strong>Cross-check the top picks against the card detail page</strong> to see real PSA pop and gem rate. If the gem rate is unknown or under 20%, treat the premium as theoretical.</li>
+            </ol>
+
+            <!-- ================================================== -->
+            <h2 id="holds">7. Long-Term Holds</h2>
+
+            <p>This tab is for buy-and-hold positions, not flips. It scores cards on a different dimension entirely: <strong>are they appreciating AND currently dipped?</strong></p>
+
+            <div class="formula-box">
+hold_score = 90d_momentum × (1 + peak_discount)
+
+90d_momentum  = (current − 90d_ago) / 90d_ago    (positive = appreciating)
+peak_discount = (12mo_max − current) / 12mo_max   (positive = below recent high)</div>
+
+            <p>The multiplication is the key insight: a card that's been rising AND is currently on sale below its peak is the textbook "buy the dip in an uptrend" setup. A card at its 12-month peak with no momentum scores 0. A card that crashed scores negative.</p>
+
+            <h3>Conviction gates (added)</h3>
+            <p>A high hold score alone isn't enough &mdash; momentum can come from a fad as easily as from real demand. To make sure a hold is a thesis and not a gamble, the tab also enforces:</p>
+            <ul>
+                <li><strong>Singles must have a cultural moat</strong> &mdash; an iconic Pokemon name (Charizard, Pikachu, Umbreon, Mewtwo, beloved Eeveelutions, etc.) <em>OR</em> a chase rarity (Special Illustration Rare, Hyper Rare, etc.). The threshold is <code>cultural ≥ 0.20</code>, which is higher than Must Buy Now's <code>0.10</code> &mdash; a multi-month hold needs more brand floor than a 30-day flip.</li>
+                <li><strong>Singles must show bullish demand</strong> &mdash; at least one of the 7d or 30d net-flow windows must be positive (meaning inventory is being absorbed faster than it's being listed).</li>
+                <li><strong>Singles must not be supply-saturated</strong> &mdash; the supply saturation index, if known, must be below 1. A flooded card is a falling knife no matter how cute the chart looks.</li>
+                <li><strong>Sealed products</strong> get a softer rule: positive momentum + the standard hold score is the conviction signal. Sealed lacks per-card market_pressure data, and every chase sealed product (a booster box of an iconic set) has implicit cultural floor.</li>
+                <li><strong>Hold score must be ≥ 0</strong> &mdash; a card that's net-down on its anchor window can't be a long-term hold by definition.</li>
+            </ul>
+
+            <div class="callout warn">
+                <strong>Why the gates matter:</strong> Without them, the hold score will happily promote a no-name card that happened to bounce from its 12-month low &mdash; technically appreciating, technically discounted, but with zero brand floor and no buyer base. That's a gamble, not a hold. The gates filter out cards where the chart looks right but the thesis is hollow.
+            </div>
+
+            <h3>What it covers</h3>
+            <p>Long-Term Holds works on <strong>both sealed products and PSA 10 singles</strong>. The Type dropdown lets you filter to one or the other:</p>
+            <ul>
+                <li><strong>Sealed</strong> (booster boxes, ETBs, mini tins, bundles, blisters) &mdash; the classic "buy and let supply dry up" play.</li>
+                <li><strong>PSA 10 singles</strong> &mdash; graded cards held as appreciating assets, not for re-sale flipping.</li>
+            </ul>
+
+            <h3>How to use it</h3>
+            <ol>
+                <li><strong>Default Type is "Both"</strong> &mdash; gives you a mixed list of sealed + PSA 10 holds. Switch to "Sealed only" if you want just boxes/ETBs.</li>
+                <li><strong>Min history (days)</strong> &mdash; filters out cards with thin price history. 60 days minimum is the default. Bump to 180 for more reliable signals.</li>
+                <li><strong>Min price $</strong> &mdash; investor-grade floor. Default $200.</li>
+                <li><strong>Click any row</strong> &mdash; sealed products open in <strong>sealed mode</strong> on the detail page, with sealed-specific stats (30d Δ, 90d Δ, off-peak %, sales volume) instead of grading-related boxes.</li>
+            </ol>
+
+            <!-- ================================================== -->
+            <h2 id="sets">8. Sets page</h2>
+
+            <p>The Sets page lists every Pokemon TCG set in the database with set-level economics: average pack cost, expected value per pack, total set raw value, PSA gem rate, etc. Click any set to drill into its detail page, which shows:</p>
+
+            <ul>
+                <li><strong>Set header stats</strong> &mdash; EV per pack (raw + PSA 10), pack cost components, total raw value, average gain/loss</li>
+                <li><strong>EV history chart</strong> &mdash; how the set's expected value has trended over time</li>
+                <li><strong>Rarity breakdown</strong> &mdash; pull rates, average prices, EV contributions by rarity tier</li>
+                <li><strong>Cards in set</strong> &mdash; the full grid of cards in the set with images, sortable and filterable</li>
+            </ul>
+
+            <h3>How to use it</h3>
+            <ol>
+                <li><strong>Find sets with positive avg gain/loss</strong> on the index page &mdash; those are sets where the EV per pack exceeds the cost (rare in modern Pokemon, valuable when it happens).</li>
+                <li><strong>Look at the rarity breakdown</strong> on a set's detail page &mdash; the Special Illustration Rare and Mega Hyper Rare rows are usually where most of the EV concentrates.</li>
+                <li><strong>Use the EV history chart</strong> to see if the set is appreciating, depreciating, or stable. New sets often crash for the first 90 days, then stabilize.</li>
+            </ol>
+
+            <!-- ================================================== -->
+            <h2 id="sealed">9. Sealed page</h2>
+
+            <p>The Sealed leaderboard groups every sealed product by category (Booster Box, Elite Trainer Box, Booster Bundle, Mini Tin, Blister, Binder Collection, etc.) and ranks each group by current market price. Every row has an image and is clickable.</p>
+
+            <p>Sealed products are a fundamentally different investment thesis than singles:</p>
+            <ul>
+                <li><strong>Time + scarcity</strong> are the two main drivers. As people open packs, supply shrinks.</li>
+                <li><strong>No grading risk</strong>. A booster box doesn't need to hit a gem grade to appreciate.</li>
+                <li><strong>Lower volatility</strong> than chase singles.</li>
+                <li><strong>Lower upside ceiling</strong> than a PSA 10 chase &mdash; but a much higher floor.</li>
+            </ul>
+
+            <h3>How to use it</h3>
+            <ol>
+                <li><strong>Click any product</strong> to see its sealed-mode detail page (30d Δ, 90d Δ, off-peak %, full price history chart).</li>
+                <li><strong>Cross-reference with the Long-Term Holds tab</strong> &mdash; the Sealed-only filter there gives you the same products ranked by hold score instead of just price.</li>
+            </ol>
+
+            <!-- ================================================== -->
+            <h2 id="calculator">10. Calculator</h2>
+
+            <p>The Calculator answers one question: <strong>if I buy N packs of a set, what's the expected pulls and the expected gain/loss?</strong> It uses the set's actual pull rates and average per-rarity prices.</p>
+
+            <h3>How it works</h3>
+            <ol>
+                <li><strong>Pick a set</strong> from the dropdown.</li>
+                <li><strong>Set the number of packs</strong> (default 36 = a booster box).</li>
+                <li><strong>Click Calculate</strong>.</li>
+            </ol>
+
+            <p>You'll see three blocks of output:</p>
+            <ul>
+                <li><strong>Expected pulls</strong> &mdash; expected count of each rarity (e.g. 1.2 Special Illustration Rares from 36 packs).</li>
+                <li><strong>Expected value</strong> &mdash; total raw value of expected pulls, total cost, gain/loss. Negative gain means the set is currently <em>not</em> +EV to rip at retail prices.</li>
+                <li><strong>P(at least 1 pull) per rarity</strong> &mdash; binomial probability that you'll pull at least one of each rarity. Useful for chase planning: "How many packs do I need to have a 50% shot at a Mega Hyper Rare?"</li>
+            </ul>
+
+            <h3>How an investor uses this</h3>
+            <ol>
+                <li><strong>Run the calculator on every recent set</strong> to find ones with positive expected gain. Those are the boxes worth ripping.</li>
+                <li><strong>Compare retail box price vs. expected value</strong> &mdash; if retail is below EV, the set is +EV at retail. Rare in modern Pokemon, but it happens with hyped sets.</li>
+                <li><strong>Use the probability chart</strong> to size your buys. If you need a 90% chance of at least one Mega Hyper Rare and the rate is 1/540 packs, you need about 1240 packs &mdash; not realistic for retail.</li>
+            </ol>
+
+            <div class="help-callout">
+                <div class="help-callout-title">A note on pull rates</div>
+                The pull rates here are <em>aggregate observed rates</em> across the entire set, not the official manufacturer rates. They're directionally accurate but don't account for box-fresh vs. heavy-shuffled product, regional weighting, or short-print anomalies. Use them for relative comparisons (set A vs. set B), not absolute predictions.
+            </div>
+
+            <!-- ================================================== -->
+            <h2 id="carddetail">11. Card detail page</h2>
+
+            <p>Click any row in any leaderboard to land here. The page shows everything we know about a single card or sealed product:</p>
+
+            <ul>
+                <li><strong>Header stats</strong> &mdash; raw price, PSA 10 price, premium $/% (or sealed equivalents like 30d Δ, 90d Δ, off-peak)</li>
+                <li><strong>Multi-source price history chart</strong> &mdash; raw prices from PriceCharting, eBay, JustTCG, and Collectrics overlaid with PSA 10 / PSA 9 historical prices</li>
+                <li><strong>Market Dynamics</strong> &mdash; supply &amp; demand pressure gauges, supply saturation index, listing volume chart, key metrics for both 7-day and 30-day windows</li>
+                <li><strong>PSA Population</strong> &mdash; PSA 10 / PSA 9 / total graded counts, gem rate %, population history chart</li>
+                <li><strong>Price Sources</strong> &mdash; latest price from each data source (PC, eBay, JustTCG, Collectrics)</li>
+            </ul>
+
+            <p>Every metric label has a hover tooltip that explains what it means in layman terms &mdash; "lower is better," etc. Hover anything you don't understand.</p>
+
+            <p><strong>Sealed mode</strong>: when you click into a sealed product (booster box, ETB, etc.), the page automatically swaps the grading-specific stat boxes for sealed-relevant ones (30d / 90d / off-peak), and hides the Market Dynamics + PSA Population sections (those are graded-card concepts).</p>
+
+            <!-- ================================================== -->
+            <h2 id="playbook">12. The investor's playbook</h2>
+
+            <p>None of these tabs are useful in isolation. The edge is in <strong>combining</strong> them. Here's how a real investor uses them together.</p>
+
+            <h3>Workflow A — find a flip (short-term hold, 30–90 days)</h3>
+            <ol>
+                <li><strong>Start in Must Buy Now</strong>. Sort by score. Look at the top 20.</li>
+                <li><strong>For each candidate</strong>, hover the score chip and check the breakdown. You want all 5 dimensions ≥ 60 OR a couple at 80+ with no &lt;30 weak spots.</li>
+                <li><strong>Cross-check with Demand Surge</strong>. If the card is in BOTH lists, the demand signal is confirmed independent of the cultural and grading components.</li>
+                <li><strong>Open the card detail page</strong>. Look at the price history chart over 90 days. You want a card that's been climbing OR rebounding off a recent dip.</li>
+                <li><strong>Check the rarity column</strong> &mdash; a Special Illustration Rare with these signals is much safer than an Ultra Rare with the same score.</li>
+                <li><strong>Buy raw, hold 30–90 days</strong>, monitor net flow. Sell when net flow turns negative or supply saturation crosses 1.</li>
+            </ol>
+
+            <h3>Workflow B — find a chase position (long-term, 6–24 months)</h3>
+            <ol>
+                <li><strong>Start in Top Chase</strong>. Set Min PSA 10 to $500.</li>
+                <li><strong>Filter mentally for iconic Pokemon</strong> with cultural impact. Charizard, Mewtwo, Lugia, Mega chase cards.</li>
+                <li><strong>Cross-check with Long-Term Holds → PSA 10 only</strong>. The hold score there tells you whether the chase is currently appreciating.</li>
+                <li><strong>Open the card detail page</strong>. You want a clean uptrend over 12 months, not a peak-and-fade pattern.</li>
+                <li><strong>Buy PSA 10, hold 6+ months</strong>. These are wealth-preservation positions, not flips.</li>
+            </ol>
+
+            <h3>Workflow C — find a sealed long-term hold</h3>
+            <ol>
+                <li><strong>Start in Long-Term Holds</strong>. Switch Type to "Sealed only".</li>
+                <li><strong>Look at the top 10–20</strong>. The Hold Score column tells you which products are appreciating AND currently dipped.</li>
+                <li><strong>Click into each one</strong>. The sealed-mode detail page shows you the full price history. You want a clean uptrend, not noise.</li>
+                <li><strong>Cross-check with the Sealed leaderboard</strong> to see what category they belong to (Booster Box vs. ETB vs. Bundle). Each has different upside profiles.</li>
+                <li><strong>Buy and hold years, not months</strong>. Sealed appreciation is slow and steady.</li>
+            </ol>
+
+            <h3>Workflow D — find an undervalued grading play</h3>
+            <ol>
+                <li><strong>Start in Best Grading Play</strong>. Sort by Premium %.</li>
+                <li><strong>Filter out the traps</strong>: bump Min raw $ to $10+ to avoid penny-card noise.</li>
+                <li><strong>Click into the top 20</strong> and check the gem rate and PSA 10 population. A high premium with no real grading data is a theoretical opportunity, not an actual one.</li>
+                <li><strong>For real opportunities</strong>: real gem rate ≥ 50%, PSA 10 pop &gt; 30 (so there's a real market), and a clean PSA 10 price history.</li>
+                <li><strong>Buy raw in volume, grade in bulk submissions</strong>. Plan for a 4–8 week grading turnaround.</li>
+            </ol>
+
+            <h3>Workflow E — discover an obscure mispricing</h3>
+            <ol>
+                <li><strong>Start in Demand Surge</strong> with Min PSA 10 set low ($50). You'll see thin-market cards with huge demand spikes.</li>
+                <li><strong>Look for cards you've never heard of</strong> with D/S ratio above 2.5.</li>
+                <li><strong>These are often mispricings the market hasn't caught up to yet</strong> &mdash; a card from a less-popular set that suddenly went viral or got featured in a YouTube pull video.</li>
+                <li><strong>Open the card detail page</strong> and look at the Listings Volume chart. If active listings are dropping while ended listings are rising, the market is being absorbed faster than it can replenish &mdash; that's a buy signal.</li>
+                <li><strong>Move fast</strong>. These windows close in days, not weeks.</li>
+            </ol>
+
+            <!-- ================================================== -->
+            <h2 id="warnings">13. Risks &amp; signal limitations</h2>
+
+            <h3>What this dashboard doesn't know</h3>
+            <ul>
+                <li><strong>Upcoming announcements</strong> &mdash; Pokemon Company announcements, set reprints, anniversary tie-ins. These move prices in hours.</li>
+                <li><strong>Influencer / YouTube hype</strong> &mdash; one viral video can move a card 5× overnight. We see the price move after; we don't predict it.</li>
+                <li><strong>Counterfeit prevalence</strong> &mdash; some chase cards have fake PSA 10s on the market. PSA pop counts are real but listing prices include fakes.</li>
+                <li><strong>Box-fresh vs. searched product</strong> &mdash; the calculator's pull rates are aggregate; weighed/searched product is real.</li>
+            </ul>
+
+            <h3>Common false signals</h3>
+            <ul>
+                <li><strong>Stamped/promo variants with huge premium %</strong> &mdash; usually have no PSA pop data; the premium is theoretical.</li>
+                <li><strong>Cards with rare lifetime PSA pop but flooded current listings</strong> &mdash; the merged Real Scarcity score now penalizes this, but always cross-check with the supply saturation column directly.</li>
+                <li><strong>One-week net flow spikes</strong> with no 30-day confirmation &mdash; could be a single whale trade. The Must Buy Now formula requires both windows to agree.</li>
+                <li><strong>"PSA 10 trajectory rising" on cards with thin history</strong> &mdash; if PSA 10 only had one observation 90 days ago, "rising" might mean "went from $30 to $300 once." Check the chart.</li>
+            </ul>
+
+            <h3>Risk management rules</h3>
+            <ul>
+                <li><strong>Never put more than 5% of your collection budget into a single card</strong>. Concentration is the #1 way investors get wiped out by hype cycles.</li>
+                <li><strong>Use sealed for the boring 60–80% of your portfolio</strong>. Lower volatility, lower headline upside, but consistent appreciation.</li>
+                <li><strong>Rotate flips every 30–90 days</strong>. Don't hold a "flip" candidate for a year hoping it goes higher.</li>
+                <li><strong>Set price alerts on the card detail page</strong> if you've taken a position. (Future feature.)</li>
+                <li><strong>Don't fight the market</strong>. If net flow turns negative on something you own, exit. The signal that got you in works in reverse.</li>
+            </ul>
+
+            <div class="help-callout help-callout-warn">
+                <div class="help-callout-title">Final reminder</div>
+                This dashboard is a screening tool, not financial advice. It surfaces statistical patterns; you make the call. A high Must Buy score is a hypothesis to investigate, not an instruction to buy. Always look at the card detail page, the recent listings on eBay, and the price history chart before committing money. Your gut is part of the model too &mdash; data confirms intuition, it doesn't replace it.
+            </div>
+
+            <p style="margin-top: 32px; padding-top:16px; border-top:1px solid #c0c0c0; font-size:11px; color:#888; text-align:center;">
+                POKEMETRICS.EXE &mdash; methodology v1.0 &mdash; built for Pokemon TCG investors who want signal, not noise.
+            </p>
+
+        </div>
+
+        <!-- Status bar -->
+        <div class="statusbar">
+            <div class="statusbar-field" id="status-msg">Help &amp; methodology</div>
+            <div class="statusbar-field" style="flex:1">scroll for full guide &middot; click TOC links to jump</div>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- TASKBAR -->
+<div class="taskbar">
+    <button class="start-btn">
+        <span style="font-size:14px;">&#9733;</span> Start
+    </button>
+    <div class="taskbar-divider"></div>
+    <button class="taskbar-task active">HELP.EXE</button>
+    <div class="taskbar-clock" id="clock"></div>
+</div>
+
+<script>
+function updateClock() {
+    const now = new Date();
+    const h = now.getHours();
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    document.getElementById('clock').textContent = `${h % 12 || 12}:${m} ${ampm}`;
+}
+updateClock();
+setInterval(updateClock, 60000);
+</script>
+
+</body>
+</html>

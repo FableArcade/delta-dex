@@ -1,0 +1,49 @@
+2026-04-10 17:57:42 | INFO  | bootstrap_pc starting shard=3/4: cards=1450 blank_images=False resume=True force_image=False dry_run=False
+2026-04-10 17:57:45 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/erikas-oddish-1 "HTTP/1.1 302 Found"
+2026-04-10 17:57:45 | INFO  | HTTP Request: GET https://www.pricecharting.com/search-products?type=prices&q=erikas+oddish+1 "HTTP/1.1 200 OK"
+2026-04-10 17:57:45 | WARNING | [1/1450] 11816375 no_match (Erika's Oddish #1)
+2026-04-10 17:57:48 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/erikas-oddish-reverse-holo-1 "HTTP/1.1 302 Found"
+2026-04-10 17:57:48 | INFO  | HTTP Request: GET https://www.pricecharting.com/search-products?type=prices&q=erikas+oddish+reverse+holo+1 "HTTP/1.1 200 OK"
+2026-04-10 17:57:48 | WARNING | [2/1450] 11815938 no_match (Erika's Oddish [Reverse Holo] #1)
+2026-04-10 17:57:51 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/erikas-tangela-7 "HTTP/1.1 302 Found"
+2026-04-10 17:57:51 | INFO  | HTTP Request: GET https://www.pricecharting.com/search-products?type=prices&q=erikas+tangela+7 "HTTP/1.1 200 OK"
+2026-04-10 17:57:51 | WARNING | [3/1450] 11815945 no_match (Erika's Tangela #7)
+2026-04-10 17:57:54 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/team-rockets-tarountula-rocket-reverse-holo-18 "HTTP/1.1 302 Found"
+2026-04-10 17:57:54 | INFO  | HTTP Request: GET https://www.pricecharting.com/search-products?type=prices&q=team+rockets+tarountula+rocket+reverse+holo+18 "HTTP/1.1 200 OK"
+2026-04-10 17:57:54 | WARNING | [4/1450] 12353464 no_match (Team Rocket's Tarountula [Rocket Reverse Holo] #18)
+2026-04-10 17:57:57 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/team-rockets-tarountula-reverse-holo-18 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:57:57 | WARNING | [5/1450] 11815955 no_match (Team Rocket's Tarountula [Reverse Holo] #18)
+2026-04-10 17:57:59 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/ethans-slugma-reverse-holo-23 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:57:59 | WARNING | [6/1450] 11816250 no_match (Ethan's Slugma [Reverse Holo] #23)
+2026-04-10 17:58:02 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/entei-reverse-holo-25 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:58:02 | WARNING | [7/1450] 11816252 no_match (Entei [Reverse Holo] #25)
+2026-04-10 17:58:05 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/tepig-reverse-holo-29 "HTTP/1.1 302 Found"
+2026-04-10 17:58:05 | INFO  | HTTP Request: GET https://www.pricecharting.com/search-products?type=prices&q=tepig+reverse+holo+29 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:58:05 | WARNING | [8/1450] 11816254 no_match (Tepig [Reverse Holo] #29)
+2026-04-10 17:58:08 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/pignite-reverse-holo-30 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:58:08 | WARNING | [9/1450] 11816255 no_match (Pignite [Reverse Holo] #30)
+2026-04-10 17:58:11 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/psyduck-reverse-holo-39 "HTTP/1.1 302 Found"
+2026-04-10 17:58:11 | INFO  | HTTP Request: GET https://www.pricecharting.com/search-products?type=prices&q=psyduck+reverse+holo+39 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:58:11 | WARNING | [10/1450] 11816258 no_match (Psyduck [Reverse Holo] #39)
+2026-04-10 17:58:14 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/golduck-reverse-holo-40 "HTTP/1.1 302 Found"
+2026-04-10 17:58:14 | INFO  | HTTP Request: GET https://www.pricecharting.com/search-products?type=prices&q=golduck+reverse+holo+40 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:58:14 | WARNING | [11/1450] 11815976 no_match (Golduck [Reverse Holo] #40)
+2026-04-10 17:58:16 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/ns-vanillite-reverse-holo-49 "HTTP/1.1 302 Found"
+2026-04-10 17:58:17 | INFO  | HTTP Request: GET https://www.pricecharting.com/search-products?type=prices&q=ns+vanillite+reverse+holo+49 "HTTP/1.1 200 OK"
+2026-04-10 17:58:17 | WARNING | [12/1450] 11816265 no_match (N's Vanillite [Reverse Holo] #49)
+2026-04-10 17:58:19 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/ns-vanillish-50 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:58:19 | WARNING | [13/1450] 11815987 no_match (N's Vanillish #50)
+2026-04-10 17:58:23 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/ns-vanillish-reverse-holo-50 "HTTP/1.1 302 Found"
+2026-04-10 17:58:23 | INFO  | HTTP Request: GET https://www.pricecharting.com/search-products?type=prices&q=ns+vanillish+reverse+holo+50 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:58:23 | WARNING | [14/1450] 11816266 no_match (N's Vanillish [Reverse Holo] #50)
+2026-04-10 17:58:26 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/ns-vanilluxe-51 "HTTP/1.1 302 Found"
+2026-04-10 17:58:26 | INFO  | HTTP Request: GET https://www.pricecharting.com/search-products?type=prices&q=ns+vanilluxe+51 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:58:26 | WARNING | [15/1450] 11815989 no_match (N's Vanilluxe #51)
+2026-04-10 17:58:30 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/ns-vanilluxe-reverse-holo-51 "HTTP/1.1 302 Found"
+2026-04-10 17:58:30 | INFO  | HTTP Request: GET https://www.pricecharting.com/search-products?type=prices&q=ns+vanilluxe+reverse+holo+51 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:58:30 | WARNING | [16/1450] 11816267 no_match (N's Vanilluxe [Reverse Holo] #51)
+2026-04-10 17:58:32 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/tapu-koko-reverse-holo-67 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:58:32 | WARNING | [17/1450] 11816275 no_match (Tapu Koko [Reverse Holo] #67)
+2026-04-10 17:58:36 | INFO  | HTTP Request: GET https://www.pricecharting.com/game/pokemon-ascended-heroes/ionos-tadbulb-69 "HTTP/1.1 302 Found"
+2026-04-10 17:58:36 | INFO  | HTTP Request: GET https://www.pricecharting.com/search-products?type=prices&q=ionos+tadbulb+69 "HTTP/1.1 403 Forbidden"
+2026-04-10 17:58:36 | WARNING | [18/1450] 11816008 no_match (Iono's Tadbulb #69)
