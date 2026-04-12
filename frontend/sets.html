@@ -163,7 +163,8 @@ function chipClass(v) {
     return n >= 0 ? "chip chip-pos" : "chip chip-neg";
 }
 
-function logoSrc(setCode) {
+function logoSrc(setCode, apiLogoUrl) {
+    if (apiLogoUrl) return apiLogoUrl;
     return `https://mycollectrics.com/images/logos/sets/small/${encodeURIComponent(setCode)}.png`;
 }
 
@@ -191,7 +192,7 @@ async function loadSets() {
             const glCls = chipClass(gl);
             return `
                 <a href="/sets/${encodeURIComponent(code)}" class="set-tile">
-                    <img src="${logoSrc(code)}" alt="${code}" loading="lazy">
+                    <img src="${logoSrc(code, s['logo-url'])}" alt="${code}" loading="lazy">
                     <div class="set-tile-name">${s["set-name"] || code}</div>
                     <div class="set-tile-stats">
                         EV: ${money2(s["ev-raw-per-pack"])}

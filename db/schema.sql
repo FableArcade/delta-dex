@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS sets (
     set_name       TEXT NOT NULL,
     release_date   TEXT,
     psa_pop_url    TEXT,
+    logo_url       TEXT,
     created_at     TEXT DEFAULT (datetime('now'))
 );
 

@@ -48,7 +48,8 @@ function chipHtml(val, type) {
     return `<span class="${cls}">${money2(val)}</span>`;
 }
 
-function logoSrc(setCode) {
+function logoSrc(setCode, apiLogoUrl) {
+    if (apiLogoUrl) return apiLogoUrl;
     return `https://mycollectrics.com/images/logos/sets/small/${encodeURIComponent(setCode)}.png`;
 }
 
@@ -168,7 +169,7 @@ function renderSetHeader(d) {
         <div class="window-body">
             <div class="set-header-row">
                 <div class="set-header-logo">
-                    <img src="${logoSrc(d["set-code"])}" alt="${d["set-code"]}">
+                    <img src="${logoSrc(d["set-code"], d["logo-url"])}" alt="${d["set-code"]}">
                 </div>
                 <div class="set-header-info">
                     <div class="set-header-title">${d["set-name"] || d["set-code"]}</div>

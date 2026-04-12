@@ -9,10 +9,12 @@ router = APIRouter()
 
 def _set_summary(row) -> dict:
     """Convert a set + leaderboard joined row into kebab-case dict."""
+    keys = set(row.keys())
     return {
         "set-code": row["set_code"],
         "set-name": row["set_name"],
         "release-date": row["release_date"],
+        "logo-url": row["logo_url"] if "logo_url" in keys else None,
         "rarity-buckets": row["rarity_buckets"],
         "cards-counted": row["cards_counted"],
         "avg-pack-cost": row["avg_pack_cost"],
@@ -139,7 +141,7 @@ def sets_index(db=Depends(get_db_conn)):
     """All sets with latest leaderboard stats."""
     rows = db.execute("""
         SELECT
-            s.set_code, s.set_name, s.release_date,
+            s.set_code, s.set_name, s.release_date, s.logo_url,
             l.rarity_buckets, l.cards_counted, l.avg_pack_cost,
             l.ev_raw_per_pack, l.ev_psa_10_per_pack, l.avg_gain_loss,
             l.total_set_raw_value,
@@ -248,10 +250,13 @@ def set_detail(set_code: str, db=Depends(get_db_conn)):
         }
 
     # --- assemble response ---
+    # logo_url may or may not exist depending on schema version
+    s_keys = set(s.keys())
     result = {
         "set-code": s["set_code"],
         "set-name": s["set_name"],
         "release-date": s["release_date"],
+        "logo-url": s["logo_url"] if "logo_url" in s_keys else None,
     }
 
     if lb:

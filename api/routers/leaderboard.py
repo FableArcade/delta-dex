@@ -18,7 +18,7 @@ def leaderboard(db=Depends(get_db_conn)):
 
     rows = db.execute("""
         SELECT
-            l.set_code, s.set_name, l.date,
+            l.set_code, s.set_name, s.logo_url, l.date,
             l.rarity_buckets, l.cards_counted, l.avg_pack_cost,
             l.ev_raw_per_pack, l.ev_psa_10_per_pack, l.avg_gain_loss,
             l.total_set_raw_value,
@@ -36,6 +36,7 @@ def leaderboard(db=Depends(get_db_conn)):
         result_rows.append({
             "set-code": r["set_code"],
             "set-name": r["set_name"],
+            "logo-url": r["logo_url"],
             "generated-at": r["date"],
             "rarity-buckets": r["rarity_buckets"],
             "cards-counted": r["cards_counted"],

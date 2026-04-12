@@ -182,12 +182,15 @@ async function drawMiniCharts(metricKey) {
     }
 }
 
-function logoSrc(setCode) {
+function logoSrc(setCode, apiLogoUrl) {
+    // Prefer logo_url from the API (pokemontcg.io), fall back to Collectrics
+    if (apiLogoUrl) return apiLogoUrl;
     return `https://mycollectrics.com/images/logos/sets/small/${encodeURIComponent(setCode)}.png`;
 }
 
 function setRow(r, rankKey, valueHtml, trendMetric, extraCols) {
     const setCode = r["set-code"];
+    const apiLogo = r["logo-url"];
     const rank = r[rankKey] ?? "\u2014";
     const cols = extraCols || "";
 
@@ -206,7 +209,7 @@ function setRow(r, rankKey, valueHtml, trendMetric, extraCols) {
         <td class="text-center"><span class="${rankClass(rank)}">${rank}</span></td>
         <td>
             <div class="set-logo-cell">
-                <img class="set-logo" src="${logoSrc(setCode)}" alt="${setCode}" loading="lazy">
+                <img class="set-logo" src="${logoSrc(setCode, apiLogo)}" alt="${setCode}" loading="lazy">
             </div>
         </td>
         <td class="text-center">${valueHtml}</td>
