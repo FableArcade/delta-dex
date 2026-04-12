@@ -335,6 +335,19 @@
             </div>
         </div>
 
+        <!-- Era filter (applies to all tabs) -->
+        <div style="padding:10px 12px;background:var(--win-surface);border-bottom:1px solid #a0a0a0;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <label style="font-size:10px;font-weight:bold;text-transform:uppercase;color:#404040;">Era Filter:</label>
+            <div class="era-tabs" style="display:flex;gap:2px;">
+                <button class="era-btn active" data-era="all"   style="height:24px;padding:0 10px;background:#dfdfdf;box-shadow:var(--bevel-sunken);border:none;cursor:pointer;font-family:inherit;font-size:11px;font-weight:bold;">All Eras</button>
+                <button class="era-btn"        data-era="sv"    style="height:24px;padding:0 10px;background:var(--win-surface);box-shadow:var(--bevel-raised);border:none;cursor:pointer;font-family:inherit;font-size:11px;">Scarlet &amp; Violet (2023+)</button>
+                <button class="era-btn"        data-era="swsh"  style="height:24px;padding:0 10px;background:var(--win-surface);box-shadow:var(--bevel-raised);border:none;cursor:pointer;font-family:inherit;font-size:11px;">Sword &amp; Shield (2020-22)</button>
+                <button class="era-btn"        data-era="sm"    style="height:24px;padding:0 10px;background:var(--win-surface);box-shadow:var(--bevel-raised);border:none;cursor:pointer;font-family:inherit;font-size:11px;">Sun &amp; Moon (2017-19)</button>
+                <button class="era-btn"        data-era="xy"    style="height:24px;padding:0 10px;background:var(--win-surface);box-shadow:var(--bevel-raised);border:none;cursor:pointer;font-family:inherit;font-size:11px;">XY &amp; Earlier (pre-2017)</button>
+            </div>
+            <span id="era-count" style="font-size:10px;color:#606060;margin-left:auto;"></span>
+        </div>
+
         <!-- Toolbar: tabs + controls -->
         <div class="opp-toolbar">
             <div class="opp-tabs">

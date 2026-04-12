@@ -25,6 +25,40 @@ const API_BASE = "/api";
 // --- state ---
 let allCards = [];
 let modelProjections = {};  // card_id -> projection data from /api/model/projections
+let currentEra = "all";     // "all" | "sv" | "swsh" | "sm" | "xy"
+
+// Era classification by set_code. Used by era filter to group cards
+// into Pokemon TCG generations.
+const SET_ERAS = {
+    // Scarlet & Violet era (2023+)
+    sv: new Set([
+        "SVI", "PAL", "OBF", "PAF", "MEW", "TEF", "TWM", "SFA", "SCR",
+        "SSP", "PRE", "JTG", "DRI", "BLK", "WHT", "PFL", "MEG", "ASC",
+        "POR", "CRZ",  // Crown Zenith (tail end of SWSH, overlaps)
+    ]),
+    // Sword & Shield era (2020-2022)
+    swsh: new Set([
+        "CPA", "VIV", "SHF", "CRE", "EVS", "CEL", "FST",
+        "BRS", "ASR", "LOR", "SIT",
+    ]),
+    // Sun & Moon era (2017-2019)
+    sm: new Set([
+        "BUS", "HIF", "SHL", "COE", "DRM",
+    ]),
+    // XY era (pre-2017)
+    xy: new Set([
+        "EVO", "GEN",
+    ]),
+};
+
+function cardEra(card) {
+    const setCode = card["set-code"];
+    if (SET_ERAS.sv.has(setCode)) return "sv";
+    if (SET_ERAS.swsh.has(setCode)) return "swsh";
+    if (SET_ERAS.sm.has(setCode)) return "sm";
+    if (SET_ERAS.xy.has(setCode)) return "xy";
+    return "unknown";
+}
 
 let view = "mustbuy";  // "mustbuy" | "undervalued" | "overvalued" | "holds" | "all"
 
@@ -1800,16 +1834,48 @@ function fullRender() {
     else if (view === "demandsurge")   list = filterDemandSurge();
     else if (view === "bestgrading")   list = filterBestGrading();
     else                                list = filterMustBuy();  // safe default
+
+    // Apply era filter on top of view filter
+    if (currentEra !== "all") {
+        list = list.filter(c => cardEra(c) === currentEra);
+    }
+
     sortList(list);
     _currentList = list;
     renderThead();
     displayedCount = 0;
     renderRows(list, 0, PAGE_SIZE);
     renderDistributionChart(list);
+    updateEraCount();
+}
+
+function updateEraCount() {
+    const el = document.getElementById("era-count");
+    if (!el) return;
+    const total = allCards.length;
+    const filtered = currentEra === "all" ? total : allCards.filter(c => cardEra(c) === currentEra).length;
+    el.textContent = currentEra === "all"
+        ? `Showing all ${total} cards`
+        : `${filtered} of ${total} cards in era`;
 }
 
 // --- toolbar wiring ---
 function wireToolbar() {
+    // -- Era filter buttons --
+    document.querySelectorAll(".era-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            currentEra = btn.dataset.era;
+            document.querySelectorAll(".era-btn").forEach(b => {
+                const active = b.dataset.era === currentEra;
+                b.classList.toggle("active", active);
+                b.style.background = active ? "#dfdfdf" : "var(--win-surface)";
+                b.style.boxShadow = active ? "var(--bevel-sunken)" : "var(--bevel-raised)";
+                b.style.fontWeight = active ? "bold" : "normal";
+            });
+            fullRender();
+        });
+    });
+
     // -- Tabs --
     document.querySelectorAll(".opp-tab").forEach(btn => {
         btn.addEventListener("click", () => {
