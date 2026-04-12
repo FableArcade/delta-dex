@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import math
+import re
 import sqlite3
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -45,6 +46,36 @@ RARITY_BONUS: Dict[str, float] = {
     "GR": 0.10, "IR": 0.08, "UR": 0.05,
 }
 
+# Cultural ceiling tiers — categorical variable capturing franchise-level
+# status that's distinct from current popularity.
+#   3 = Franchise face: unbounded ceiling, series-defining
+#   2 = Mascot tier: very high ceiling, persistent fan favorites
+#   1 = Popular tier: strong ceiling but bounded (hype cycles shorter)
+#   0 = Standard: baseline
+CULTURAL_TIERS: Dict[str, int] = {
+    # Tier 3: Franchise faces
+    "charizard": 3, "pikachu": 3,
+    # Tier 2: Mascot-tier (iconic across generations, strong merchandise presence)
+    "mewtwo": 2, "mew": 2, "umbreon": 2, "lugia": 2, "rayquaza": 2,
+    "eevee": 2, "gengar": 2,
+    # Tier 1: Popular tier (beloved but bounded — hype cycles shorter)
+    "snorlax": 1, "dragonite": 1, "sylveon": 1, "espeon": 1,
+    "vaporeon": 1, "jolteon": 1, "flareon": 1, "glaceon": 1,
+    "leafeon": 1, "gardevoir": 1, "lucario": 1, "arcanine": 1,
+    "gyarados": 1, "blastoise": 1, "venusaur": 1, "alakazam": 1,
+    "machamp": 1, "greninja": 1, "garchomp": 1, "tyranitar": 1,
+    "dialga": 1, "palkia": 1, "giratina": 1, "arceus": 1,
+    "zacian": 1, "zamazenta": 1,
+}
+
+# Regex for extracting core Pokemon name: strip suffixes (V, VMAX, VSTAR,
+# EX, GX, BREAK, ex), card numbers, brackets, parens, rarity tags.
+_POKEMON_NAME_CLEAN = re.compile(
+    r"\s*(?:v\s*(?:max|star)?|ex|gx|break|le?g|vmax|vstar|"
+    r"#\S+|\[.+?\]|\(.+?\)|\b(?:reverse|holo|rainbow|gold|full art|promo)\b)",
+    re.IGNORECASE,
+)
+
 
 def cultural_score(product_name: str, rarity_code: Optional[str]) -> float:
     name_lower = product_name.lower()
@@ -55,6 +86,33 @@ def cultural_score(product_name: str, rarity_code: Optional[str]) -> float:
             break
     bonus = RARITY_BONUS.get(rarity_code or "", 0.0)
     return min(1.0, name_score + bonus)
+
+
+def cultural_tier(product_name: str) -> int:
+    """Return ceiling tier (0-3) for a card based on the Pokemon name."""
+    name_lower = product_name.lower()
+    # Check highest tier first to avoid miscategorizing
+    for tier_val in (3, 2, 1):
+        for key, val in CULTURAL_TIERS.items():
+            if val == tier_val and key in name_lower:
+                return tier_val
+    return 0
+
+
+def extract_pokemon_name(product_name: str) -> str:
+    """Extract the core Pokemon name from a card product name.
+
+    Examples:
+      "Charizard VSTAR #GG70" -> "charizard"
+      "Origin Forme Dialga VSTAR #GG68" -> "origin forme dialga"
+      "Hisuian Zoroark VSTAR" -> "hisuian zoroark"
+      "Team Rocket's Mewtwo" -> "team rocket's mewtwo"
+    """
+    name = product_name.lower()
+    name = _POKEMON_NAME_CLEAN.sub("", name)
+    # Collapse whitespace
+    name = " ".join(name.split()).strip()
+    return name
 
 
 # ---------------------------------------------------------------------------
@@ -78,11 +136,14 @@ def build_training_dataset(db: sqlite3.Connection) -> pd.DataFrame:
     ).fetchall()
     logger.info("Found %d non-sealed cards", len(cards))
 
-    # Pre-compute cultural scores
-    cultural_scores = {
-        r["id"]: cultural_score(r["product_name"], r["rarity_code"])
-        for r in cards
-    }
+    # Pre-compute cultural scores, tiers, and Pokemon name mapping
+    cultural_scores = {}
+    cultural_tiers_by_card = {}
+    pokemon_names = {}
+    for r in cards:
+        cultural_scores[r["id"]] = cultural_score(r["product_name"], r["rarity_code"])
+        cultural_tiers_by_card[r["id"]] = cultural_tier(r["product_name"])
+        pokemon_names[r["id"]] = extract_pokemon_name(r["product_name"])
     card_ids = [r["id"] for r in cards]
 
     # Load all price history into a DataFrame for fast access
@@ -98,6 +159,27 @@ def build_training_dataset(db: sqlite3.Connection) -> pd.DataFrame:
     )
     price_df["date"] = pd.to_datetime(price_df["date"])
     logger.info("Loaded %d price history rows", len(price_df))
+
+    # Pre-compute per-Pokemon running max price across ALL cards of that
+    # Pokemon, month by month. This captures franchise-level ceiling:
+    # if any Pikachu card has ever hit $5000, that's a ceiling signal for
+    # any new Pikachu printing. Uses trailing max (no future leakage).
+    logger.info("Pre-computing per-Pokemon historical peaks...")
+    price_df_peak = price_df.copy()
+    price_df_peak["pokemon"] = price_df_peak["card_id"].map(pokemon_names)
+    price_df_peak = price_df_peak[price_df_peak["psa_10_price"].notna() &
+                                    (price_df_peak["psa_10_price"] >= MIN_PSA10_PRICE)]
+    price_df_peak["month"] = price_df_peak["date"].dt.to_period("M").dt.to_timestamp()
+    # For each (pokemon, month), find the max PSA 10 price seen in that month
+    monthly_max = price_df_peak.groupby(["pokemon", "month"])["psa_10_price"].max().reset_index()
+    monthly_max = monthly_max.sort_values(["pokemon", "month"])
+    # Running cumulative max up to and including this month
+    monthly_max["running_max"] = monthly_max.groupby("pokemon")["psa_10_price"].cummax()
+    pokemon_peak_by_month = {}
+    for _, row in monthly_max.iterrows():
+        pokemon_peak_by_month[(row["pokemon"], row["month"])] = float(row["running_max"])
+    logger.info("Indexed peaks for %d pokemon x months",
+                len(pokemon_peak_by_month))
 
     # Load PSA pop history
     psa_df = pd.read_sql_query(
@@ -147,6 +229,8 @@ def build_training_dataset(db: sqlite3.Connection) -> pd.DataFrame:
 
         dates = monthly.index.tolist()
         cult_score = cultural_scores.get(card_id, 0.0)
+        cult_tier = cultural_tiers_by_card.get(card_id, 0)
+        pokemon_name = pokemon_names.get(card_id, "")
 
         # Get PSA data for this card
         card_psa = psa_df[psa_df["card_id"] == card_id].set_index("date").sort_index()
@@ -179,6 +263,20 @@ def build_training_dataset(db: sqlite3.Connection) -> pd.DataFrame:
             )
             if features is None:
                 continue
+
+            # Add new cultural features
+            features["cultural_tier"] = float(cult_tier)
+            # Pokemon peak-ever as-of anchor date (trailing, no leakage).
+            # Use monthly bucket — peak through anchor's month, inclusive.
+            month = pd.Timestamp(anchor_date.year, anchor_date.month, 1)
+            peak = pokemon_peak_by_month.get((pokemon_name, month))
+            if peak is None or peak <= 0:
+                # Fallback: use this card's own trailing max
+                peak = float(prices[prices.index <= anchor_date].max() or anchor_price)
+            # Log scale so $100 peak and $10000 peak are both meaningful
+            features["pokemon_peak_log"] = math.log10(max(peak, 1.0))
+            # Ratio of current price to pokemon's ever-peak (0.1 = deep value, 1.0 = at peak)
+            features["pokemon_peak_ratio"] = anchor_price / peak if peak > 0 else 1.0
 
             features["card_id"] = card_id
             features["anchor_date"] = anchor_date.isoformat()[:10]
@@ -294,6 +392,8 @@ FEATURE_COLUMNS = [
     "net_flow_pct_30d", "demand_pressure_7d", "demand_pressure_30d",
     "supply_saturation_index", "ds_ratio", "gem_pct", "psa_10_pop",
     "psa_10_vs_raw_pct", "cultural_score", "rarity_tier", "history_days",
+    # v1.1: Cultural ceiling features
+    "cultural_tier", "pokemon_peak_log", "pokemon_peak_ratio",
 ]
 
 
@@ -303,6 +403,31 @@ def build_live_features(db: sqlite3.Connection) -> pd.DataFrame:
     Returns a DataFrame indexed by card_id with FEATURE_COLUMNS.
     """
     logger.info("Building live feature vectors...")
+
+    # Pre-compute current peak-ever per Pokemon name across all cards
+    logger.info("Computing per-Pokemon current peaks for live inference...")
+    all_cards = db.execute(
+        "SELECT id, product_name FROM cards WHERE sealed_product = 'N'"
+    ).fetchall()
+    pokemon_names_map = {r["id"]: extract_pokemon_name(r["product_name"]) for r in all_cards}
+
+    peak_df = pd.read_sql_query("""
+        SELECT card_id, MAX(psa_10_price) AS peak
+        FROM price_history
+        WHERE psa_10_price IS NOT NULL
+        GROUP BY card_id
+    """, db)
+    card_peak = dict(zip(peak_df["card_id"], peak_df["peak"]))
+    # Aggregate by Pokemon name
+    pokemon_peak = {}
+    for card_id, pokemon in pokemon_names_map.items():
+        peak = card_peak.get(card_id)
+        if peak is None or peak <= 0:
+            continue
+        existing = pokemon_peak.get(pokemon, 0)
+        if peak > existing:
+            pokemon_peak[pokemon] = float(peak)
+    logger.info("Indexed peaks for %d unique Pokemon", len(pokemon_peak))
 
     # Use the same card_index query pattern as the API
     rows = db.execute("""
@@ -398,6 +523,15 @@ def build_live_features(db: sqlite3.Connection) -> pd.DataFrame:
         ds = dp / sp if sp and sp > 0 else 1.0
 
         cult = cultural_score(r["product_name"], r["rarity_code"])
+        cult_tier = cultural_tier(r["product_name"])
+
+        # v1.1 cultural ceiling features
+        pokemon = pokemon_names_map.get(r["id"], "")
+        peak = pokemon_peak.get(pokemon)
+        if peak is None or peak <= 0:
+            peak = psa10  # Fallback: this card's own current price
+        peak_log = math.log10(max(peak, 1.0))
+        peak_ratio = psa10 / peak if peak > 0 else 1.0
 
         features_list.append({
             "card_id": r["id"],
@@ -421,6 +555,10 @@ def build_live_features(db: sqlite3.Connection) -> pd.DataFrame:
             "cultural_score": cult,
             "rarity_tier": 0.0,
             "history_days": float(r["history_days"] or 0),
+            # v1.1: Cultural ceiling features
+            "cultural_tier": float(cult_tier),
+            "pokemon_peak_log": peak_log,
+            "pokemon_peak_ratio": peak_ratio,
         })
 
     df = pd.DataFrame(features_list)

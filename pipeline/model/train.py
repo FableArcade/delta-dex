@@ -63,7 +63,7 @@ def train_model(
     Returns dict with model_version, metrics, and paths.
     """
     date_str = dt.date.today().isoformat()
-    version = version_tag or f"v1_{date_str}"
+    version = version_tag or f"v1_1_{date_str}"
 
     # Step 1: Build dataset
     df = build_training_dataset(db)
