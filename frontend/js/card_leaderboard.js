@@ -735,21 +735,6 @@ function filterMustBuy() {
         out.push(c);
     }
 
-    // When model available, re-sort by projected return (model-driven ranking)
-    // Cards with positive confidence_low (even pessimistic case is profitable) go first
-    if (hasProjections) {
-        out.sort((a, b) => {
-            const aProj = Number.isFinite(a._projReturn) ? a._projReturn : -Infinity;
-            const bProj = Number.isFinite(b._projReturn) ? b._projReturn : -Infinity;
-            // Primary: cards where confidence_low > 0 (high conviction) first
-            const aConv = (a._confLow != null && a._confLow > 0) ? 1 : 0;
-            const bConv = (b._confLow != null && b._confLow > 0) ? 1 : 0;
-            if (aConv !== bConv) return bConv - aConv;
-            // Secondary: sort by projected return descending
-            return bProj - aProj;
-        });
-    }
-
     return out;
 }
 
