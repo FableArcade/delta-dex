@@ -301,9 +301,13 @@
 
         /* Table scroll removed — window-body handles scroll now */
 
+        .tab-short { display: none; }
+
         /* ---- Mobile responsive ---- */
         @media (max-width: 768px) {
             .desktop { padding: 0; }
+            .tab-full { display: none; }
+            .tab-short { display: inline; }
 
             /* Rank column minimal */
             table.win-table thead th:nth-child(1),
@@ -324,25 +328,28 @@
             /* Hide era filter on mobile — too many buttons */
             .era-filter-row { display: none !important; }
 
-            /* Tabs: compact, toolbar wraps so controls show below */
+            /* Tabs: 3x2 grid so they all fit without scrolling */
             .opp-toolbar {
                 padding: 3px 6px;
                 gap: 4px;
                 flex-wrap: wrap;
             }
             .opp-tabs {
-                flex-wrap: nowrap;
+                display: grid;
+                grid-template-columns: 1fr 1fr 1fr;
                 gap: 2px;
+                width: 100%;
             }
             .opp-tab {
                 font-size: 9px;
-                padding: 0 6px;
+                padding: 0 4px;
                 height: 22px;
                 white-space: nowrap;
-                flex-shrink: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
             }
 
-            /* Controls: compact inline row */
+            /* Controls: single compact row */
             .opp-controls-ev,
             .opp-controls-holds,
             .opp-controls-mustbuy,
@@ -351,20 +358,29 @@
             .opp-controls-demandsurge,
             .opp-controls-bestgrading,
             .opp-controls-sentiment {
+                display: flex;
                 flex-wrap: wrap;
-                gap: 4px;
+                gap: 4px 8px;
                 font-size: 10px;
+                width: 100%;
             }
-            .opp-control { font-size: 10px; }
-            .opp-control label { font-size: 9px; }
-            .opp-control input[type="number"] { width: 50px; }
+            .opp-control {
+                font-size: 10px;
+                flex-direction: row;
+                align-items: center;
+                gap: 3px;
+            }
+            .opp-control label { font-size: 9px; white-space: nowrap; }
+            .opp-control input[type="number"] { width: 45px; height: 20px; font-size: 10px; }
+            .opp-control select { max-width: 110px; height: 20px; font-size: 10px; }
+            .opp-control input[type="range"] { width: 60px; }
 
             /* Hide formula notes + philosophy on mobile */
             .opp-philosophy { display: none; }
             .opp-formula-note { display: none; }
 
             /* Range slider smaller */
-            .range-slider { width: 100px; }
+            .range-slider { width: 80px; }
 
             /* Table: tighter, horizontal scroll */
             table.win-table { font-size: 11px; }
@@ -488,12 +504,12 @@
         <!-- Toolbar: tabs + controls -->
         <div class="opp-toolbar">
             <div class="opp-tabs">
-                <button class="opp-tab buythedip active"  data-view="buythedip">&#8600; Buy the Dip</button>
-                <button class="opp-tab mustbuy"           data-view="mustbuy">&#9889; Top Picks</button>
-                <button class="opp-tab topchase"          data-view="topchase">&#128293; Top Chase</button>
-                <button class="opp-tab demandsurge"       data-view="demandsurge">&#128200; Demand Surge</button>
-                <button class="opp-tab bestgrading"       data-view="bestgrading">&#128142; Best Grading Play</button>
-                <button class="opp-tab holds"             data-view="holds">Long-Term Holds</button>
+                <button class="opp-tab buythedip active"  data-view="buythedip"><span class="tab-full">&#8600; Buy the Dip</span><span class="tab-short">Dip</span></button>
+                <button class="opp-tab mustbuy"           data-view="mustbuy"><span class="tab-full">&#9889; Top Picks</span><span class="tab-short">Picks</span></button>
+                <button class="opp-tab topchase"          data-view="topchase"><span class="tab-full">&#128293; Top Chase</span><span class="tab-short">Chase</span></button>
+                <button class="opp-tab demandsurge"       data-view="demandsurge"><span class="tab-full">&#128200; Demand Surge</span><span class="tab-short">Surge</span></button>
+                <button class="opp-tab bestgrading"       data-view="bestgrading"><span class="tab-full">&#128142; Best Grading Play</span><span class="tab-short">Grade</span></button>
+                <button class="opp-tab holds"             data-view="holds"><span class="tab-full">Long-Term Holds</span><span class="tab-short">Holds</span></button>
             </div>
 
             <!-- Controls specific to Demand Surge view -->
