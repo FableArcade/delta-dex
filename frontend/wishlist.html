@@ -165,17 +165,42 @@
             border: 1px solid #c0c0c0;
             white-space: nowrap;
         }
+
+        @media (max-width: 768px) {
+            .wl-toolbar {
+                gap: 8px;
+                padding: 6px 8px;
+            }
+            .wl-control input[type="number"] { width: 80px; }
+            .wl-control select { width: 130px; font-size: 11px; }
+            .wl-headline { font-size: 10px; white-space: normal; margin-left: 0; }
+            .opp-philosophy { display: none; }
+
+            /* Table compact */
+            .wl-table th, .wl-table td { padding: 3px 4px; font-size: 10px; }
+            .wl-img { width: 36px; height: 50px; }
+            .wl-name { font-size: 11px; }
+
+            /* Hide IMAGE column */
+            .wl-table th:nth-child(2),
+            .wl-table td:nth-child(2) { display: none; }
+            /* Hide WHY column */
+            .wl-table th:last-child,
+            .wl-table td:last-child { display: none; }
+
+            .wl-empty { padding: 24px 12px; font-size: 12px; }
+            .wl-pct-bar { width: 50px; }
+        }
     </style>
 </head>
 <body>
-<div class="delta-badge">DELTA EDITION</div>
-
 <div class="desktop">
     <div class="window">
 
         <!-- Title bar -->
         <div class="window-title">
             <span class="window-title-text">WISHLIST.EXE - prioritized buy list</span>
+            <span class="delta-badge">DELTA EDITION</span>
             <div class="window-controls">
                 <button class="window-btn">_</button>
                 <button class="window-btn">&square;</button>

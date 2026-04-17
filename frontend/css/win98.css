@@ -61,20 +61,21 @@ body {
    ============================================================ */
 
 .delta-badge {
-    position: fixed;
-    top: 8px;
-    right: 12px;
-    z-index: 9999;
-    padding: 3px 10px;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+    padding: 2px 10px;
     background: linear-gradient(180deg, #ffe066 0%, #ff9900 100%);
     color: #000;
     font-family: 'Courier New', monospace;
-    font-size: 10px;
+    font-size: 9px;
     font-weight: bold;
     letter-spacing: 1px;
     text-transform: uppercase;
-    border: 2px solid #000;
-    box-shadow: var(--bevel-raised), 2px 2px 0 rgba(0,0,0,0.3);
+    border: 1px solid #000;
+    pointer-events: none;
 }
 
 /* ============================================================
@@ -133,6 +134,7 @@ body {
     padding: 4px 4px 4px 6px;
     display: flex;
     align-items: center;
+    position: relative;
     gap: 6px;
     font-weight: bold;
     font-size: 14px;
@@ -218,40 +220,50 @@ body {
     color: var(--win-highlight-text);
 }
 
-/* Mobile hamburger nav */
+/* Hamburger nav — works on all screen sizes */
 .menu-hamburger {
     display: none;
     padding: 2px 8px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 12px;
     background: none;
     border: none;
     font-family: inherit;
-    font-weight: bold;
+}
+.menu-hamburger:hover {
+    background: var(--win-highlight);
+    color: var(--win-highlight-text);
 }
 .menu-dropdown {
     display: none;
     position: absolute;
     top: 100%;
     left: 0;
-    right: 0;
     z-index: 100;
     background: var(--win-surface);
     box-shadow: var(--bevel-raised), 2px 2px 0 rgba(0,0,0,0.2);
-    border-bottom: 1px solid var(--win-surface-dark);
+    border: 1px solid var(--win-surface-dark);
     flex-direction: column;
+    min-width: 160px;
 }
 .menu-dropdown.open { display: flex; }
 .menu-dropdown .menu-item {
-    padding: 6px 12px;
-    border-bottom: 1px solid #b0b0b0;
+    padding: 4px 16px;
+    border-bottom: 1px solid #d0d0d0;
+    display: block;
+    font-size: 12px;
 }
+.menu-dropdown .menu-item:last-child { border-bottom: none; }
 
 @media (max-width: 768px) {
     .menubar > .menu-item { display: none; }
     .menubar > .updated-badge { display: none; }
     .menu-hamburger { display: block; }
-    .menu-dropdown .menu-item { display: block; }
+}
+
+/* On desktop, show hamburger too (as the File menu equivalent) */
+@media (min-width: 769px) {
+    .menu-hamburger { display: none; }
 }
 
 /* ============================================================
