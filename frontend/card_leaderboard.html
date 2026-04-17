@@ -362,11 +362,15 @@
                 font-size: 11px;
             }
 
-            /* Hide IMAGE and SET columns on mobile */
-            table.win-table thead th:nth-child(2),
-            table.win-table tbody td:nth-child(2) { display: none; }
+            /* Hide SET column on mobile, keep IMAGE */
             table.win-table thead th:nth-child(4),
             table.win-table tbody td:nth-child(4) { display: none; }
+
+            /* Smaller card images on mobile */
+            table.win-table tbody td img {
+                width: 36px !important;
+                height: 50px !important;
+            }
 
             /* Table horizontal scroll */
             .win-table-wrap {
