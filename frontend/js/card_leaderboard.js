@@ -1287,22 +1287,22 @@ const HEADERS = {
         { key: "name",    label: "CARD NAME" },
         { key: "set",     label: "SET" },
         { key: "psa10",   label: "PSA 10" },
+        { key: "ratio",   label: "D/S RATIO" },
+        { key: "nfpct",   label: "NET FLOW %" },
         { key: "proj",    label: "90D PROJ" },
         { key: "demand",  label: "DEMAND" },
         { key: "supply",  label: "SUPPLY" },
-        { key: "ratio",   label: "D/S RATIO" },
-        { key: "nfpct",   label: "NET FLOW %" },
     ],
     bestgrading: [
         { key: "rank",   label: "#",         width: 50 },
         { key: "none",   label: "IMAGE",     width: 60 },
         { key: "name",   label: "CARD NAME" },
         { key: "set",    label: "SET" },
-        { key: "raw",    label: "RAW" },
         { key: "psa10",  label: "PSA 10" },
-        { key: "gem",    label: "GEM %" },
-        { key: "ev",     label: "EV $" },
         { key: "roi",    label: "ROI %" },
+        { key: "ev",     label: "EV $" },
+        { key: "raw",    label: "RAW" },
+        { key: "gem",    label: "GEM %" },
         { key: "mult",   label: "PAYOUT \u00d7" },
     ],
 };
@@ -1453,11 +1453,11 @@ function renderRowsBestGrading(list, start, count) {
             <td>${imgUrl ? `<img src="${imgUrl}" alt="" style="width:56px;height:78px;object-fit:contain;" loading="lazy">` : "\u2014"}</td>
             <td>${name}</td>
             <td>${setCode}</td>
-            <td class="text-right text-mono">${money(rawPrice)}</td>
             <td class="text-right text-mono">${money(psa10Price)}</td>
-            <td class="text-right ${gemCls}">${gemStr}</td>
-            <td class="text-right text-mono">${evStr}</td>
             <td class="text-right"><span class="${tierCls}">${roiStr}</span></td>
+            <td class="text-right text-mono">${evStr}</td>
+            <td class="text-right text-mono">${money(rawPrice)}</td>
+            <td class="text-right ${gemCls}">${gemStr}</td>
             <td class="text-right text-mono">${multStr}</td>
         `;
         tbody.appendChild(tr);
@@ -1511,11 +1511,11 @@ function renderRowsDemandSurge(list, start, count) {
             <td>${name}</td>
             <td>${setCode}</td>
             <td class="text-right text-mono">${money(psa10Price)}</td>
+            <td class="text-right"><span class="${esc(ratioCls)}">${ratioStr}</span></td>
+            <td class="text-right"><span class="${esc(nfCls)}">${nfPctStr}</span></td>
             <td class="text-right">${dsProjHtml}</td>
             <td class="text-right text-mono">${demandStr}</td>
             <td class="text-right text-mono">${supplyStr}</td>
-            <td class="text-right"><span class="${esc(ratioCls)}">${ratioStr}</span></td>
-            <td class="text-right"><span class="${esc(nfCls)}">${nfPctStr}</span></td>
         `;
         tbody.appendChild(tr);
     }
