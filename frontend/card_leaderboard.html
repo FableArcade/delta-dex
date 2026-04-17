@@ -578,10 +578,8 @@
             </div>
         </div>
 
-        <!-- Scrollable content: table + chart (era filter + tabs stay pinned above) -->
+        <!-- Scrollable: cards only -->
         <div class="window-content">
-
-        <!-- Table -->
         <div class="window-body-flush">
             <div class="win-table-wrap">
                 <div class="table-scroll">
@@ -597,12 +595,14 @@
             </div>
         </div>
 
-        <!-- Load More -->
-        <div style="text-align:center; padding: 4px 0;">
+        </div><!-- /window-content (scrollable cards only) -->
+
+        <!-- Load More (pinned above chart) -->
+        <div style="text-align:center; padding: 2px 0; background:var(--win-surface); border-top:1px solid #a0a0a0;">
             <button class="btn btn-primary" id="load-more-btn" style="display:none;">Load More Cards</button>
         </div>
 
-        <!-- Distribution chart: curved plot of the current filtered list, ranked by score -->
+        <!-- Distribution chart (pinned to bottom of window) -->
         <div class="dist-chart-box">
             <div class="dist-chart-title" id="dist-chart-title">Opportunity distribution</div>
             <div class="dist-chart-sub" id="dist-chart-sub">Each card in the current filter is plotted on the curve. Green above zero = undervalued. Red below zero = overvalued.</div>
@@ -610,8 +610,6 @@
                 <canvas id="dist-chart"></canvas>
             </div>
         </div>
-
-        </div><!-- /window-content (scrollable) -->
 
         <!-- Status bar (pinned to bottom of window) -->
         <div class="statusbar">
