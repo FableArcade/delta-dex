@@ -357,21 +357,24 @@
             .opp-controls-bestgrading,
             .opp-controls-sentiment {
                 display: flex;
-                flex-wrap: wrap;
-                gap: 4px 8px;
-                font-size: 10px;
+                flex-wrap: nowrap;
+                gap: 6px;
+                font-size: 9px;
                 width: 100%;
+                align-items: center;
             }
             .opp-control {
-                font-size: 10px;
+                font-size: 9px;
                 flex-direction: row;
                 align-items: center;
-                gap: 3px;
+                gap: 2px;
+                flex-shrink: 0;
             }
-            .opp-control label { font-size: 9px; white-space: nowrap; }
-            .opp-control input[type="number"] { width: 45px; height: 20px; font-size: 10px; }
-            .opp-control select { max-width: 110px; height: 20px; font-size: 10px; }
-            .opp-control input[type="range"] { width: 60px; }
+            .opp-control label { font-size: 8px; white-space: nowrap; }
+            .opp-control input[type="number"] { width: 40px; height: 18px; font-size: 9px; }
+            .opp-control select { max-width: 100px; height: 18px; font-size: 9px; }
+            .opp-control input[type="range"] { width: 50px; }
+            .opp-control span { font-size: 9px; min-width: 20px; }
 
             /* Hide formula notes + philosophy on mobile */
             .opp-philosophy { display: none; }
@@ -502,11 +505,11 @@
         <!-- Toolbar: tabs + controls -->
         <div class="opp-toolbar">
             <div class="opp-tabs">
-                <button class="opp-tab buythedip active"  data-view="buythedip"><span class="tab-full">&#8600; Buy the Dip</span><span class="tab-short">&#8600;Dip</span></button>
-                <button class="opp-tab mustbuy"           data-view="mustbuy"><span class="tab-full">&#9889; Top Picks</span><span class="tab-short">&#9889;Picks</span></button>
-                <button class="opp-tab topchase"          data-view="topchase"><span class="tab-full">&#128293; Top Chase</span><span class="tab-short">&#128293;Chase</span></button>
-                <button class="opp-tab demandsurge"       data-view="demandsurge"><span class="tab-full">&#128200; Demand Surge</span><span class="tab-short">&#128200;Surge</span></button>
-                <button class="opp-tab bestgrading"       data-view="bestgrading"><span class="tab-full">&#128142; Best Grading Play</span><span class="tab-short">&#128142;Grade</span></button>
+                <button class="opp-tab buythedip active"  data-view="buythedip"><span class="tab-full">&#8600; Buy the Dip</span><span class="tab-short">&#8600; Dip</span></button>
+                <button class="opp-tab mustbuy"           data-view="mustbuy"><span class="tab-full">&#9889; Top Picks</span><span class="tab-short">&#9889; Picks</span></button>
+                <button class="opp-tab topchase"          data-view="topchase"><span class="tab-full">&#128293; Top Chase</span><span class="tab-short">&#128293; Chase</span></button>
+                <button class="opp-tab demandsurge"       data-view="demandsurge"><span class="tab-full">&#128200; Demand Surge</span><span class="tab-short">&#128200; Surge</span></button>
+                <button class="opp-tab bestgrading"       data-view="bestgrading"><span class="tab-full">&#128142; Best Grading Play</span><span class="tab-short">&#128142; Grade</span></button>
                 <button class="opp-tab holds"             data-view="holds"><span class="tab-full">Long-Term Holds</span><span class="tab-short">Holds</span></button>
             </div>
 
