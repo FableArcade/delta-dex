@@ -395,12 +395,17 @@
                 height: 50px !important;
             }
 
-            /* Hide less important columns on mobile per tab:
-               ATH (6th), ATH DATE (7th), SAT IDX (9th), NF 7D (10th), NF 30D (11th) */
+            /* Hide columns 5-11 on mobile, keep: #(1), IMAGE(2), NAME(3), key price(5-6 area), SCORE(last)
+               Different tabs have different column layouts but hiding middle columns
+               works for all — keeps rank, image, name, and the last 2-3 visible */
+            table.win-table thead th:nth-child(5),
+            table.win-table tbody td:nth-child(5) { display: none; }
             table.win-table thead th:nth-child(6),
             table.win-table tbody td:nth-child(6) { display: none; }
             table.win-table thead th:nth-child(7),
             table.win-table tbody td:nth-child(7) { display: none; }
+            table.win-table thead th:nth-child(8),
+            table.win-table tbody td:nth-child(8) { display: none; }
             table.win-table thead th:nth-child(9),
             table.win-table tbody td:nth-child(9) { display: none; }
             table.win-table thead th:nth-child(10),
@@ -573,7 +578,7 @@
             <div class="opp-controls-holds" style="display:none;">
                 <div class="opp-control" title="Which kind of long-term holdable to show.">
                     <label for="hold-type">Type</label>
-                    <select id="hold-type" style="height:22px;border:none;box-shadow:var(--bevel-sunken);background:var(--win-white);padding:2px 4px;font-family:inherit;font-size:11px;">
+                    <select id="hold-type" style="height:22px;border:none;box-shadow:var(--bevel-sunken);background:var(--win-white);padding:2px 4px;font-family:inherit;font-size:11px;max-width:130px;">
                         <option value="both" selected>Sealed + PSA 10</option>
                         <option value="sealed">Sealed only</option>
                         <option value="psa10">PSA 10 only</option>
