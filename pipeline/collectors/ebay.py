@@ -187,8 +187,13 @@ class EBayCollector(BaseCollector):
     # Classification & aggregation
     # ------------------------------------------------------------------
 
-    def _aggregate_listings(self, items: list[dict]) -> dict:
-        """Classify listings and compute counts and average prices by bucket."""
+    def _aggregate_listings(self, items: list[dict], use_api_total: bool = True) -> dict:
+        """Classify listings and compute counts and average prices by bucket.
+
+        When ``use_api_total`` is True (active listings), uses eBay's reported
+        total count instead of len(items). When False (ended/sold listings),
+        uses len(items) as the count since we only want the 24h snapshot.
+        """
         buckets: dict[str, list[dict]] = {
             "raw": [], "graded": [], "psa_10": [], "psa_9": [], "other_10": [],
         }
@@ -210,10 +215,8 @@ class EBayCollector(BaseCollector):
                     prices.append(v)
             return round(sum(prices) / len(prices), 2) if prices else None
 
-        # Use the real total from eBay's response (stashed on first item by
-        # _search_card), not len(items) which is capped at 200 by the API limit.
         total = len(items)
-        if items and "_total_from_api" in items[0]:
+        if use_api_total and items and "_total_from_api" in items[0]:
             total = int(items[0]["_total_from_api"])
         return {
             "total": total,
@@ -335,13 +338,13 @@ class EBayCollector(BaseCollector):
 
             card_id = card["id"]
             try:
-                # Active listings
+                # Active listings — use API total for real supply count
                 active_items = self._search_card(card, sold=False)
-                active_agg = self._aggregate_listings(active_items)
+                active_agg = self._aggregate_listings(active_items, use_api_total=True)
 
-                # Recently ended/sold listings
+                # Recently ended/sold — use len(items) for 24h snapshot
                 ended_items = self._search_card(card, sold=True)
-                ended_agg = self._aggregate_listings(ended_items)
+                ended_agg = self._aggregate_listings(ended_items, use_api_total=False)
 
                 snapshot = self._build_snapshot(card_id, date, active_agg, ended_agg)
                 self._upsert(snapshot)

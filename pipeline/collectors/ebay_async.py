@@ -166,10 +166,10 @@ class AsyncEBayCollector(EBayCollector):
             card_id = card["id"]
             try:
                 active_items = await self._async_search(card, sold=False)
-                active_agg = self._aggregate_listings(active_items)
+                active_agg = self._aggregate_listings(active_items, use_api_total=True)
 
                 ended_items = await self._async_search(card, sold=True)
-                ended_agg = self._aggregate_listings(ended_items)
+                ended_agg = self._aggregate_listings(ended_items, use_api_total=False)
 
                 snapshot = self._build_snapshot(card_id, date, active_agg, ended_agg)
                 self._upsert(snapshot)
