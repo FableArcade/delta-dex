@@ -258,12 +258,11 @@
         .anchor-badge.anchor-90d { background: #c8e8ff; color: #003060; border-color: #4080c0; }
         .anchor-badge.anchor-30d { background: #f8e8c8; color: #604000; border-color: #c08040; font-style: italic; }
 
-        /* Distribution chart (below the table) — pushed to bottom of content */
+        /* Distribution chart (directly below load-more, no gap) */
         .dist-chart-box {
             border-top: 2px groove var(--win-surface);
             background: #f3f3f3;
             padding: 6px 14px 8px;
-            margin-top: auto;
         }
         .dist-chart-title {
             font-size: 10px;
@@ -454,7 +453,7 @@
         </div>
 
         <!-- Scrollable content area (window frame is fixed, this scrolls) -->
-        <div class="window-body" style="flex:1;overflow-y:auto;overflow-x:hidden;padding:0;display:flex;flex-direction:column;">
+        <div class="window-body" style="flex:1;overflow-y:auto;overflow-x:hidden;padding:0;">
 
         <!-- Era filter (applies to all tabs) -->
         <div style="padding:10px 12px;background:var(--win-surface);border-bottom:1px solid #a0a0a0;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -598,7 +597,7 @@
         </div>
 
         <!-- Load More -->
-        <div class="window-body" style="text-align:center; padding: 8px;">
+        <div style="text-align:center; padding: 4px 0;">
             <button class="btn btn-primary" id="load-more-btn" style="display:none;">Load More Cards</button>
         </div>
 
