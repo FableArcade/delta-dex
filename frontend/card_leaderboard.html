@@ -395,17 +395,12 @@
                 height: 50px !important;
             }
 
-            /* Hide columns 5-11 on mobile, keep: #(1), IMAGE(2), NAME(3), key price(5-6 area), SCORE(last)
-               Different tabs have different column layouts but hiding middle columns
-               works for all — keeps rank, image, name, and the last 2-3 visible */
-            table.win-table thead th:nth-child(5),
-            table.win-table tbody td:nth-child(5) { display: none; }
+            /* Mobile columns: keep #(1) IMAGE(2) NAME(3) PSA10(5) DIP%(8) SCORE(12)
+               Hide: SET(4) ATH(6) ATHDATE(7) SATIDX(9) NF7D(10) NF30D(11) */
             table.win-table thead th:nth-child(6),
             table.win-table tbody td:nth-child(6) { display: none; }
             table.win-table thead th:nth-child(7),
             table.win-table tbody td:nth-child(7) { display: none; }
-            table.win-table thead th:nth-child(8),
-            table.win-table tbody td:nth-child(8) { display: none; }
             table.win-table thead th:nth-child(9),
             table.win-table tbody td:nth-child(9) { display: none; }
             table.win-table thead th:nth-child(10),
