@@ -22,6 +22,7 @@
         }
         .opp-tabs {
             display: flex;
+            flex-wrap: wrap;
             gap: 2px;
         }
         .opp-tab {
@@ -292,6 +293,139 @@
             border: 1px solid #c0c0c0;
             white-space: nowrap;
         }
+
+        /* ---- Fixed window height across tabs (classic Windows feel) ---- */
+        .table-scroll {
+            min-height: 60vh;
+        }
+
+        /* ---- Mobile responsive ---- */
+        @media (max-width: 768px) {
+            .window { margin: 0 !important; }
+            .desktop { padding: 0; }
+            .delta-badge { font-size: 10px; padding: 2px 8px; }
+
+            /* Tabs: wrap and fill width */
+            .opp-tabs {
+                width: 100%;
+                flex-wrap: wrap;
+            }
+            .opp-tab {
+                font-size: 10px;
+                padding: 0 8px;
+                height: 28px;
+                flex: 1 1 auto;
+                min-width: 0;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            /* Toolbar stacks vertically */
+            .opp-toolbar {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 6px;
+                padding: 6px 8px;
+            }
+
+            /* Controls wrap tighter */
+            .opp-controls-ev,
+            .opp-controls-holds,
+            .opp-controls-mustbuy,
+            .opp-controls-buythedip,
+            .opp-controls-topchase,
+            .opp-controls-demandsurge,
+            .opp-controls-bestgrading,
+            .opp-controls-sentiment {
+                flex-wrap: wrap;
+                gap: 6px;
+                font-size: 11px;
+            }
+            .opp-control { font-size: 11px; }
+            .opp-philosophy { white-space: normal; font-size: 10px; }
+            .opp-formula-note { font-size: 9px; }
+
+            /* Era filter wraps */
+            .era-filter {
+                flex-wrap: wrap;
+                gap: 4px;
+            }
+            .era-btn {
+                font-size: 10px !important;
+                padding: 0 6px !important;
+                height: 22px !important;
+            }
+
+            /* Table: smaller font, tighter padding for phone */
+            table.win-table { font-size: 11px; }
+            table.win-table thead th {
+                padding: 3px 4px;
+                font-size: 9px;
+            }
+            table.win-table tbody td {
+                padding: 4px 4px;
+                font-size: 11px;
+            }
+            /* Hide less critical columns on mobile */
+            table.win-table thead th:nth-child(2),
+            table.win-table tbody td:nth-child(2) {
+                display: none; /* hide IMAGE column */
+            }
+            table.win-table thead th:nth-child(4),
+            table.win-table tbody td:nth-child(4) {
+                display: none; /* hide SET column */
+            }
+
+            /* Card images in table */
+            table.win-table tbody td img {
+                width: 35px !important;
+                height: 49px !important;
+            }
+
+            /* Table container scrolls horizontally */
+            .table-scroll {
+                min-height: 50vh;
+                max-height: 60vh;
+            }
+            .win-table-wrap {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            /* Distribution chart shorter */
+            .dist-chart-wrap { height: 200px; }
+            .dist-chart-title { font-size: 11px; }
+            .dist-chart-sub { font-size: 9px; }
+
+            /* Description text */
+            .window-body p { font-size: 11px; }
+
+            /* Range slider fits phone */
+            .range-slider { width: 140px; }
+
+            /* Tooltip repositioning */
+            [data-tip]::after {
+                min-width: 180px;
+                max-width: 260px;
+                font-size: 10px;
+                right: auto;
+                left: 0;
+            }
+
+            /* Taskbar */
+            .taskbar { height: 28px; }
+            .start-btn { font-size: 11px; padding: 0 8px; }
+            .taskbar-task { font-size: 10px; }
+        }
+
+        /* Small phones */
+        @media (max-width: 400px) {
+            .opp-tab { font-size: 9px; padding: 0 5px; }
+            table.win-table { font-size: 10px; }
+            table.win-table thead th { font-size: 8px; padding: 2px 3px; }
+            table.win-table tbody td { padding: 3px 3px; font-size: 10px; }
+        }
     </style>
 </head>
 <body>
@@ -472,7 +606,7 @@
                             <!-- Populated dynamically by js/card_leaderboard.js based on view -->
                         </thead>
                         <tbody id="card-tbody">
-                            <tr><td colspan="10" style="text-align:center;color:#808080;">Loading...</td></tr>
+                            <tr><td colspan="12" style="text-align:center;color:#808080;">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
