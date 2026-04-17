@@ -328,25 +328,23 @@
             /* Hide era filter on mobile — too many buttons */
             .era-filter-row { display: none !important; }
 
-            /* Tabs: 3x2 grid so they all fit without scrolling */
+            /* Tabs: single row, all 6 fit */
             .opp-toolbar {
-                padding: 3px 6px;
-                gap: 4px;
+                padding: 3px 4px;
+                gap: 3px;
                 flex-wrap: wrap;
             }
             .opp-tabs {
-                display: grid;
-                grid-template-columns: 1fr 1fr 1fr;
-                gap: 2px;
+                display: flex;
+                gap: 1px;
                 width: 100%;
             }
             .opp-tab {
-                font-size: 9px;
-                padding: 0 4px;
-                height: 22px;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
+                font-size: 8px;
+                padding: 0 3px;
+                height: 20px;
+                flex: 1;
+                min-width: 0;
             }
 
             /* Controls: single compact row */
