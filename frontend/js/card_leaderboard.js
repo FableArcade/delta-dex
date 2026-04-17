@@ -96,7 +96,7 @@ const HOLDS_MIN_MOMENTUM   = 0.03;     // 3% real appreciation over anchor windo
 const HOLDS_MIN_SEALED_SCORE = 0.08;   // 8% composite score minimum for sealed
 
 // Must-buy view knobs (smart-investor composite score, 0-100)
-let mustBuyMinScore = 50;       // default min score — v3.2 additive (model 35 + cultural/demand/scarcity/momentum/grading + setup kicker)
+let mustBuyMinScore = 30;       // default min score — v3.2 additive (model 35 + cultural/demand/scarcity/momentum/grading + setup kicker)
 // Cultural hard gate: 0.15 requires EITHER an iconic Pokemon name match
 // OR a chase rarity ≥ Special Illustration Rare (0.20). Basic Energy cards
 // with only a Hyper Rare rarity bonus (0.12) fall below this — correctly,
