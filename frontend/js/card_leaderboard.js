@@ -65,7 +65,7 @@ function cardEra(card) {
     return "unknown";
 }
 
-let view = "buythedip";  // "buythedip" | "mustbuy" | "topchase" | "demandsurge" | "bestgrading" | "holds"
+let view = "mustbuy";  // "mustbuy" | "buythedip" | "topchase" | "demandsurge" | "bestgrading" | "holds"
 
 // Constants used by computeEvScore (which feeds into Must Buy Now's hard gates).
 // No UI to tweak these now — Must Buy Now uses fixed defaults so the score is
@@ -152,7 +152,7 @@ const PAGE_SIZE = 100;
 // ranking by projected_return earned +102% cumulative vs -12% for the
 // old composite. Pure model ranking is the investor-optimal default;
 // users can still toggle to "MB Score" via the column header.
-let currentSort = { key: "dipscore", dir: "desc" };
+let currentSort = { key: "mbscore", dir: "desc" };
 
 // Current filtered list (cached so Load More and column sort don't re-fetch)
 let _currentList = [];
