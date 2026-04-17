@@ -1,0 +1,47 @@
+# Development junk — never needs to ship.
+.git
+.gitignore
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.DS_Store
+*.swp
+*.swo
+*.tmp
+
+# Local env + secrets
+.env
+.env.*
+!.env.example
+
+# Heavy caches/logs — would blow image size from 400MB to ~3GB.
+data/cache/
+data/logs/
+data/tmp/
+data/models/exp_v1_2_dataset.parquet
+data/models/realistic_backtest_*.json
+data/models/walkforward_*.json
+
+# DB downloads from GitHub release on first boot (56MB compressed).
+# Models excluded — predictions won't run until retrained on server.
+# Entire data/ dir excluded — everything is either seeded or generated at runtime.
+data/
+
+# graphify output (dev only)
+graphify-out/
+
+# Frontend screenshot artifacts (devtime only).
+*.png
+!frontend/images/*.png
+
+# Editor + doc scratch
+*.log
+docs/scratch/
+
+# Node (none but future-proof)
+node_modules

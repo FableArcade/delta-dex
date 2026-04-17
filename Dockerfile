@@ -23,8 +23,9 @@ RUN apt-get update \
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# App code
+# App code (data/ excluded via .dockerignore — DB downloads on first boot)
 COPY . .
+RUN mkdir -p /app/data
 
 # Cron schedule — scrapers run on the server, not localhost.
 # Times are UTC. Adjust if needed.
