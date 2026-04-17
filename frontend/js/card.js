@@ -73,7 +73,7 @@ const METRIC_TOOLTIPS = {
     avg_active:        "Average number of active eBay listings for this card over the window. Higher = more supply sitting on the market. Context matters — scarce chase cards often have <5 active at any time.",
     avg_ended:         "Average number of eBay auctions that ended (mostly sold) per window. Higher = more turnover and liquidity. Compare against Avg Active — you want ended ≥ active for a healthy market.",
     sold_rate_est:     "Estimated percentage of listings that actually sell through (vs sit unsold). Higher = faster turnover = healthier market. Above 60% is strong.",
-    sales_volume:      "How often this card trades on PriceCharting's data. Higher = more liquid — easier to buy or exit a position quickly.",
+    sales_volume:      "eBay sold listings in the last 7 days. Higher = more liquid — easier to buy or exit a position quickly.",
 
     // Price stat boxes
     raw_price:         "Current UNGRADED market price. This is your base cost before any grading fees.",
@@ -211,6 +211,9 @@ let currentListingRange = "all";
             const projData = await projRes.json();
             const proj = (projData.projections || {})[cardId];
             if (proj) cardData._projection = proj;
+            // Track data freshness (used to render a staleness banner on projections).
+            cardData._dataAsOf = projData.data_as_of || null;
+            cardData._lastPipelineRunAt = projData.last_pipeline_run_at || null;
         }
 
         renderAll();
@@ -237,11 +240,13 @@ function renderAll() {
     renderMarketDynamics();
     renderPSAPopulation();
     renderPriceSources();
+    renderAlphaLinkage();
     setupIntervalButtons();
     renderModelProjection();
+    renderTournamentPlay();
     document.getElementById("window-title").textContent =
-        `POKEDELTA.EXE - ${cardData["product-name"] || "Card Detail"}`;
-    document.title = `${cardData["product-name"] || "Card"} | PokeDelta`;
+        `DELTADEX.EXE - ${cardData["product-name"] || "Card Detail"}`;
+    document.title = `${cardData["product-name"] || "Card"} | Delta Dex`;
 }
 
 /* ============================================================
@@ -269,6 +274,11 @@ function renderHeader() {
         placeholder.textContent = "No image available";
         frame.appendChild(placeholder);
     }
+    renderRarityGrid();
+    // Cultural + promo disclaimer render unconditionally — they apply even to
+    // cards with no rarity-grade payload (e.g., promos missing pull data).
+    renderCulturalRelevance();
+    renderPromoRarityDisclaimer();
 
     // Name
     document.getElementById("card-name").textContent = d["product-name"] || "Unknown Product";
@@ -512,6 +522,9 @@ function renderHeader() {
                 const vol = (max1y - min1y) / psa10Now;
                 volEl.textContent = vol.toFixed(2) + "x";
             }
+
+            // 5) Set Alpha label (compact) — hover-popover wires lazily
+            renderAlphaStatBox();
         }
     }
     const statusSrc = document.getElementById("status-source");
@@ -1139,6 +1152,317 @@ function renderPriceSources() {
 }
 
 /* ============================================================
+   RARITY CORNER — pull rate + gem rate + composite grade
+   ============================================================ */
+
+function renderRarityGrid() {
+    const grid = document.getElementById("rarity-grid");
+    if (!grid) return;
+    const rg = cardData?.["rarity-grade"];
+    if (!rg || cardData?.["is-sealed"]) { grid.style.display = "none"; return; }
+
+    const {
+        "specific-pull-rate": specificPull,
+        "gem-rate": gemRate,
+        "combined-odds": combined,
+        "grade-basis": basis,
+        grade,
+    } = rg;
+
+    // Always render the grid — fields that are missing show as "—"
+    grid.style.display = "";
+
+    const fmtOdds = (p) => {
+        if (p == null) return "—";
+        if (p >= 0.01) return `${(p * 100).toFixed(1)}%`;
+        return `1 in ${Math.round(1 / p).toLocaleString()}`;
+    };
+
+    const variantLabel = rg["variant-label"];
+    const gEl = document.getElementById("stat-rarity-grade");
+
+    if (basis === "variant") {
+        // Non-chase card — replace the grade glyph with the variant name
+        gEl.textContent = variantLabel || "—";
+        gEl.className = "stat-box-value grade-C";
+        gEl.style.fontSize = variantLabel && variantLabel.length > 10 ? "13px" : "15px";
+        gEl.style.lineHeight = "1.15";
+    } else {
+        gEl.textContent = grade || "—";
+        gEl.className = `stat-box-value grade-${(grade || "C").replace("+", "-plus")}`;
+        gEl.style.fontSize = "22px";
+        gEl.style.lineHeight = "1";
+    }
+
+    const basisEl = gEl.parentElement?.querySelector(".stat-box-label");
+    if (basisEl) {
+        const suffixMap = {
+            "combined":   "",
+            "pull-only":  " (pull-only)",
+            "variant":    " (non-chase)",
+        };
+        basisEl.childNodes[0].textContent = "Rarity Grade" + (suffixMap[basis] || "");
+    }
+
+    document.getElementById("stat-pull-rate").textContent  = fmtOdds(specificPull);
+    document.getElementById("stat-gem-rate").textContent   = gemRate != null ? `${Math.round(gemRate * 100)}%` : "—";
+    document.getElementById("stat-psa10-odds").textContent = fmtOdds(combined);
+
+    renderCulturalRelevance();
+    renderPromoRarityDisclaimer();
+}
+
+/* ============================================================
+   CULTURAL RELEVANCE — 0..1 score rendered under the rarity grid
+   ============================================================ */
+const PROMO_SET_CODES = new Set(["PROMO", "KRP", "JPP"]);
+
+function renderCulturalRelevance() {
+    const grid = document.getElementById("cultural-grid");
+    if (!grid || !cardData) return;
+    const compute = window.WishlistStore && window.WishlistStore.culturalImpactScore;
+    if (!compute) { grid.style.display = "none"; return; }
+
+    const raw = compute(cardData);
+    if (!Number.isFinite(raw)) { grid.style.display = "none"; return; }
+
+    grid.style.display = "";
+    const pct = Math.round(raw * 100);
+    const valEl = document.getElementById("stat-cultural-relevance");
+    const tierEl = document.getElementById("stat-cultural-tier");
+
+    valEl.textContent = `${pct}%`;
+    // Tier bucketing — matches rubric used elsewhere (wishlist rationale,
+    // must-buy): 75+ iconic, 45+ strong, 20+ moderate, else weak.
+    let tierLabel, tierClass;
+    if      (raw >= 0.75) { tierLabel = "Iconic";   tierClass = "grade-S";  }
+    else if (raw >= 0.45) { tierLabel = "Strong";   tierClass = "grade-A";  }
+    else if (raw >= 0.20) { tierLabel = "Moderate"; tierClass = "grade-B";  }
+    else                  { tierLabel = "Weak";     tierClass = "grade-C";  }
+    valEl.className = `stat-box-value ${tierClass}`;
+    tierEl.textContent = tierLabel;
+}
+
+function renderPromoRarityDisclaimer() {
+    const el = document.getElementById("promo-rarity-disclaimer");
+    if (!el || !cardData) return;
+    const setCode = cardData["set-code"];
+    const name = (cardData["product-name"] || "").toLowerCase();
+    const isPromo = PROMO_SET_CODES.has(setCode)
+                 || /\b(promo|sv-?p|sm-?p|xy-?p|s-?p)\b/.test(name);
+    el.style.display = isPromo ? "" : "none";
+}
+
+/* ============================================================
+   F) SET-ALPHA LINKAGE (panel + compact stat box + popover)
+   ============================================================ */
+
+function renderAlphaLinkage() {
+    const wrap = document.getElementById("alpha-linkage-wrap");
+    if (!wrap) return;
+    const link = cardData["alpha-linkage"];
+    if (!link || !link["alpha-card-id"] || cardData["is-sealed"]) {
+        wrap.style.display = "none";
+        return;
+    }
+    wrap.style.display = "";
+
+    const isSelf = link["is-self"];
+    const explainer = document.getElementById("alpha-linkage-explainer");
+    if (isSelf) {
+        explainer.textContent = "this IS the set alpha — other chase cards in this set tend to follow its moves";
+    } else {
+        explainer.textContent = "how this card tracks the top chase card in its set — based on the alpha-beta thesis backtest (mean lead ρ +0.266 across 17 sets)";
+    }
+
+    const alphaLink = document.getElementById("alpha-link");
+    alphaLink.textContent = link["alpha-name"] || "---";
+    alphaLink.href = isSelf ? "#" : `card.html?id=${encodeURIComponent(link["alpha-card-id"])}`;
+    alphaLink.style.textDecoration = isSelf ? "none" : "underline";
+    alphaLink.style.cursor = isSelf ? "default" : "pointer";
+
+    const c = Number(link["contemp-corr"]);
+    const l = Number(link["lead-corr"]);
+    document.getElementById("alpha-contemp-cell").textContent = Number.isFinite(c) ? c.toFixed(2) : "---";
+    document.getElementById("alpha-lead-cell").textContent = Number.isFinite(l) ? (l >= 0 ? "+" : "") + l.toFixed(2) : "---";
+
+    const cur = Number(link["alpha-psa10-current"]);
+    const a30 = Number(link["alpha-psa10-30d-ago"]);
+    const a90 = Number(link["alpha-psa10-90d-ago"]);
+    const r30 = Number.isFinite(cur) && Number.isFinite(a30) && a30 > 0 ? cur / a30 - 1 : null;
+    const r90 = Number.isFinite(cur) && Number.isFinite(a90) && a90 > 0 ? cur / a90 - 1 : null;
+    document.getElementById("alpha-30d-cell").textContent =
+        r30 == null ? "---" : `${r30 >= 0 ? "+" : ""}${Math.round(r30 * 100)}%`;
+    document.getElementById("alpha-90d-cell").textContent =
+        r90 == null ? "---" : `${r90 >= 0 ? "+" : ""}${Math.round(r90 * 100)}%`;
+
+    document.getElementById("alpha-linkage-verdict-body").textContent = verdictFor(isSelf, c, l, r30, r90);
+}
+
+function verdictFor(isSelf, contemp, lead, r30, r90) {
+    if (isSelf) {
+        if (r30 != null && r30 <= -0.10) return `You own the set alpha — and it's down ${Math.round(r30 * 100)}% in 30 days. Expect beta cards in this set to follow lower over the next month.`;
+        if (r30 != null && r30 >= 0.10) return `You own the set alpha and it's up +${Math.round(r30 * 100)}% in 30 days. Betas in this set typically ride the wave with a 1-month lag.`;
+        return "You own the set alpha — its trajectory leads the other chase cards in this set.";
+    }
+    if (!Number.isFinite(contemp)) return "Not enough monthly overlap yet to judge linkage.";
+    let strength;
+    if (contemp >= 0.70) strength = "tight co-movement";
+    else if (contemp >= 0.50) strength = "meaningful beta";
+    else if (contemp >= 0.30) strength = "modest linkage";
+    else                      strength = "weak / mostly independent";
+    const parts = [`Contemp ρ=${contemp.toFixed(2)} — ${strength}.`];
+    if (r30 != null && r30 <= -0.10 && contemp >= 0.50) parts.push(`⚠ Set alpha down ${Math.round(r30 * 100)}% in 30d. Given the linkage strength, a drag on this card over the next month is likely.`);
+    else if (r30 != null && r30 <= -0.03 && contemp >= 0.50 && (r90 == null || r90 < 0)) parts.push(`⚠ Set alpha softening (${Math.round(r30 * 100)}% 30d). Watch for beta drag.`);
+    else if (r30 != null && r30 >= 0.05 && contemp >= 0.50) parts.push(`Alpha trending up (+${Math.round(r30 * 100)}% 30d) — positive tailwind for this card.`);
+    else if (contemp >= 0.50) parts.push(`Alpha flat — this card's move will likely be idiosyncratic over the next month.`);
+    else parts.push(`Linkage too weak to use as a forecasting signal — trade this card on its own chart.`);
+    if (Number.isFinite(lead) && lead >= 0.30) parts.push(`Lead ρ=${(lead >= 0 ? "+" : "") + lead.toFixed(2)} — the alpha's move THIS month has historically predicted a same-direction move in this card NEXT month.`);
+    return parts.join(" ");
+}
+
+function renderAlphaStatBox() {
+    const wrap = document.getElementById("stat-alpha-wrap");
+    const label = document.getElementById("stat-alpha-label");
+    const selfTag = document.getElementById("stat-alpha-self-tag");
+    if (!wrap || !label) return;
+
+    const link = cardData?.["alpha-linkage"];
+    if (!link || !link["alpha-card-id"] || cardData["is-sealed"]) {
+        label.textContent = "—";
+        label.title = "No alpha linkage (insufficient history for this set)";
+        wrap.style.pointerEvents = "none";
+        wrap.style.opacity = "0.55";
+        return;
+    }
+    wrap.style.pointerEvents = "";
+    wrap.style.opacity = "";
+
+    const isSelf = !!link["is-self"];
+    const corr = Number(link["contemp-corr"]);
+    const alphaShort = (link["alpha-name"] || "alpha").replace(/\s*#\d+\s*$/, "").trim();
+
+    if (isSelf) {
+        selfTag.style.display = "";
+        label.textContent = "this card";
+        label.title = "This IS the set alpha — hover to see the betas tracking it";
+    } else {
+        selfTag.style.display = "none";
+        label.textContent = `${alphaShort}${Number.isFinite(corr) ? ` ρ${corr.toFixed(2)}` : ""}`;
+        label.title = `Tracks ${link["alpha-name"]} with correlation ${corr.toFixed(2)}. Hover to see peers.`;
+    }
+
+    if (!wrap.dataset.bound) {
+        wrap.dataset.bound = "1";
+        let hoverTimer = null;
+        wrap.addEventListener("mouseenter", () => { hoverTimer = setTimeout(openAlphaPopover, 120); });
+        wrap.addEventListener("mouseleave", () => {
+            if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null; }
+            setTimeout(() => {
+                const pop = document.getElementById("alpha-popover");
+                if (pop && !pop.matches(":hover")) pop.style.display = "none";
+            }, 150);
+        });
+        wrap.addEventListener("click", (e) => {
+            if (e.target.id === "alpha-popover" || e.target.closest("#alpha-popover")) return;
+            if (isSelf) { openAlphaPopover(); return; }
+            const alphaId = cardData?.["alpha-linkage"]?.["alpha-card-id"];
+            if (alphaId) window.location.href = `card.html?id=${encodeURIComponent(alphaId)}`;
+        });
+        const pop = document.getElementById("alpha-popover");
+        if (pop) pop.addEventListener("mouseleave", () => { pop.style.display = "none"; });
+    }
+}
+
+let alphaPeersCache = null;
+async function openAlphaPopover() {
+    const pop = document.getElementById("alpha-popover");
+    const title = document.getElementById("alpha-popover-title");
+    const body = document.getElementById("alpha-popover-body");
+    if (!pop || !title || !body) return;
+    pop.style.display = "block";
+    if (alphaPeersCache) { fillAlphaPopover(alphaPeersCache); return; }
+    title.textContent = "Loading peers…";
+    body.textContent = "";
+    try {
+        const res = await fetch(`${API_BASE}/card/${encodeURIComponent(cardData.id)}/peers?min_corr=0.60`);
+        const json = await res.json();
+        alphaPeersCache = json;
+        fillAlphaPopover(json);
+    } catch (err) {
+        title.textContent = "Couldn't load peers";
+        body.textContent = "";
+    }
+}
+
+function fillAlphaPopover(data) {
+    const title = document.getElementById("alpha-popover-title");
+    const body = document.getElementById("alpha-popover-body");
+    body.textContent = "";
+    const allPeers = data?.peers || [];
+    // First row is the card being viewed; the rest are its peers ranked by ρ
+    const self = allPeers.find(p => p["is-self"]);
+    const others = allPeers.filter(p => !p["is-self"]);
+
+    if (!others.length) {
+        const selfName = self?.["product-name"] || "This card";
+        title.textContent = `${selfName} — no strong peers`;
+        const note = document.createElement("div");
+        note.style.padding = "6px";
+        note.style.color = "#666";
+        note.textContent = "No other cards in this set correlate above ρ=0.60 with this one.";
+        body.appendChild(note);
+        return;
+    }
+
+    // Cap at 8 so the popover stays scannable even for the tightest clusters
+    const peers = [];
+    if (self) peers.push(self);
+    for (const p of others.slice(0, 8)) peers.push(p);
+
+    const selfShort = (self?.["product-name"] || "this card").replace(/\s*#\d+\s*$/, "").trim();
+    title.textContent = `${selfShort} — correlated cluster`;
+
+    for (const p of peers) {
+        const row = document.createElement("div");
+        row.className = "alpha-popover-row";
+        if (p["is-alpha"]) row.classList.add("is-alpha");
+        if (p["is-self"])  row.classList.add("is-self");
+        const name = document.createElement("span");
+        name.textContent = (p["is-alpha"] ? "★ " : "") + (p["product-name"] || `#${p["card-number"]}`) + (p["is-self"] ? "  (this card)" : "");
+        row.appendChild(name);
+        const corrEl = document.createElement("span");
+        corrEl.className = "alpha-corr";
+        if (p["is-self"]) {
+            corrEl.textContent = "this card";
+        } else if (Number.isFinite(p["corr"])) {
+            const weak = p["weak-alpha"] ? " (weak)" : "";
+            corrEl.textContent = `ρ ${Number(p["corr"]).toFixed(2)}${p["is-alpha"] ? " ★" : ""}${weak}`;
+        } else if (p["is-alpha"]) {
+            corrEl.textContent = "★ alpha";
+        } else {
+            corrEl.textContent = "—";
+        }
+        row.appendChild(corrEl);
+        const retEl = document.createElement("span");
+        retEl.className = "alpha-ret";
+        const r = p["psa10-30d-return"];
+        if (Number.isFinite(r)) { retEl.textContent = (r >= 0 ? "+" : "") + Math.round(r * 100) + "%"; retEl.classList.add(r >= 0 ? "up" : "down"); }
+        else retEl.textContent = "—";
+        row.appendChild(retEl);
+        row.addEventListener("click", () => {
+            if (p["is-self"]) return;
+            window.location.href = `card.html?id=${encodeURIComponent(p.id)}`;
+        });
+        body.appendChild(row);
+    }
+    const footer = document.createElement("div");
+    footer.className = "alpha-popover-footer";
+    footer.textContent = "Cards in this set that correlate ρ ≥ 0.60 with this card. ★ = set alpha. Click to open.";
+    body.appendChild(footer);
+}
+
+/* ============================================================
    INTERVAL BUTTON SETUP
    ============================================================ */
 
@@ -1177,12 +1501,43 @@ function renderModelProjection() {
         bandEl.textContent = (lo * 100).toFixed(0) + "% to " + (hi * 100).toFixed(0) + "%";
     }
 
-    // Confidence label
+    // Confidence label + abstention UX for LOW cases (PAIR: low-confidence is
+    // a first-class state; hand control back to the user, don't force a number).
+    // Thresholds calibrated meaning-first: LOW means conspicuously uncertain
+    // (top ~8% of cards by disagreement width), not mild disagreement.
+    // v2_0 bootstrap-ensemble p25/p75 widths — max 0.11, median 0.04.
     const confEl = document.getElementById("proj-confidence");
+    const isLow = width >= 0.08;
+    const isMedium = width >= 0.05 && width < 0.08;
     if (confEl) {
-        const label = width < 0.15 ? "HIGH" : width < 0.30 ? "MEDIUM" : "LOW";
+        const label = isLow ? "LOW" : isMedium ? "MEDIUM" : "HIGH";
         confEl.textContent = label;
-        confEl.style.color = width < 0.15 ? "#006400" : width < 0.30 ? "#806000" : "#880000";
+        confEl.style.color = isLow ? "#880000" : isMedium ? "#806000" : "#006400";
+    }
+
+    // Abstention treatment: when confidence is LOW, de-emphasize the point
+    // estimate and surface what the user should check themselves.
+    const abstainEl = document.getElementById("proj-abstain");
+    if (abstainEl) {
+        while (abstainEl.firstChild) abstainEl.removeChild(abstainEl.firstChild);
+        if (isLow) {
+            if (retEl) retEl.style.opacity = "0.4";
+            abstainEl.style.display = "";
+            const hdr = document.createElement("strong");
+            hdr.style.color = "#880000";
+            hdr.textContent = "Interval too wide to act on. ";
+            abstainEl.appendChild(hdr);
+            const widthPts = Math.round(width * 1000) / 10;
+            abstainEl.appendChild(document.createTextNode(
+                "The bootstrap-ensemble p25–p75 band spans " + widthPts + " points — this card's " +
+                "models disagree more than typical. Don't size a position on the point estimate. " +
+                "Check: recent sales volume, grading population trends, any catalysts (anime, set rotation) " +
+                "the model can't see."
+            ));
+        } else {
+            if (retEl) retEl.style.opacity = "1";
+            abstainEl.style.display = "none";
+        }
     }
 
     // Feature waterfall — top 5 contributors
@@ -1215,6 +1570,172 @@ function renderModelProjection() {
     if (verEl) {
         verEl.textContent = "Model: " + (proj["model-version"] || "unknown") +
             " | As of: " + (proj["as-of"] || "unknown");
+    }
+
+    // Data freshness / staleness indicator.
+    // >36h since last run => visible warning + mute the projection block.
+    applyStalenessIndicator(
+        container,
+        cardData._dataAsOf || proj["as-of"] || null,
+        cardData._lastPipelineRunAt || null
+    );
+
+    // Show the "Where this model fails" block whenever a projection renders.
+    // (PAIR: calibrated trust > maximum trust — teach users the model's weak spots.)
+    renderModelCaveats(proj, contribs);
+}
+
+/* ============================================================
+   WHERE THIS MODEL FAILS — calibrated-trust block per PAIR.
+   Base caveats are static (unmodeled signal classes). Per-card
+   caveats are derived from the projection itself: thin listing
+   history, sparse SHAP contributions, out-of-distribution rarity.
+   ============================================================ */
+function renderModelCaveats(proj, contribs) {
+    const container = document.getElementById("model-caveats");
+    if (!container) return;
+    container.style.display = "";
+
+    const perCard = document.getElementById("caveats-per-card");
+    if (!perCard) return;
+    while (perCard.firstChild) perCard.removeChild(perCard.firstChild);
+
+    const warnings = [];
+
+    // Sparse SHAP = few features carried meaningful weight => thin signal
+    const nContribs = contribs ? Object.keys(contribs).length : 0;
+    if (nContribs > 0 && nContribs < 5) {
+        warnings.push(
+            "Only " + nContribs + " feature(s) drove this projection — the model had thin signal on this card. " +
+            "Treat the point estimate as illustrative, not decisive."
+        );
+    }
+
+    // Wide interval is already flagged in the abstention block above; this
+    // captures the "MED but leaning wide" case.
+    const w = proj["confidence-width"];
+    if (Number.isFinite(w) && w >= 0.22 && w < 0.30) {
+        warnings.push(
+            "Interval width " + Math.round(w * 100) + " points is on the wider side of MEDIUM — adjacent to LOW-confidence territory."
+        );
+    }
+
+    // Staleness => fresh data missing
+    if (proj["as-of"]) {
+        const f = freshnessLabel(proj["as-of"]);
+        if (f.hoursAgo > 72) {
+            warnings.push(
+                "Projection is " + Math.round(f.hoursAgo / 24) + " days old. Real market state may have diverged."
+            );
+        }
+    }
+
+    if (warnings.length === 0) return;
+
+    const hdr = document.createElement("div");
+    hdr.style.cssText = "font-size:10px;font-weight:bold;text-transform:uppercase;color:#606060;margin-bottom:6px;";
+    hdr.textContent = "Specific gaps for this card";
+    perCard.appendChild(hdr);
+
+    const ul = document.createElement("ul");
+    ul.style.cssText = "margin:0;padding-left:20px;line-height:1.6;";
+    for (const w of warnings) {
+        const li = document.createElement("li");
+        li.textContent = w;
+        ul.appendChild(li);
+    }
+    perCard.appendChild(ul);
+}
+
+/* Tournament play rendering — shows when the card has recent competitive
+   appearances in the tournament_appearances table. Section stays hidden
+   when the card has no tournament signal. */
+function renderTournamentPlay() {
+    const container = document.getElementById("tournament-play");
+    if (!container) return;
+    const tp = cardData["tournament-play"];
+    if (!tp || !tp["appearances-90d"]) {
+        container.style.display = "none";
+        return;
+    }
+    container.style.display = "";
+
+    const apps = tp["appearances-90d"] || 0;
+    const top8 = tp["top8-appearances-90d"] || 0;
+    const tours = tp["distinct-tournaments-90d"] || 0;
+    const lastSeen = tp["last-seen"] || "";
+
+    const set = (id, text) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    };
+    set("tp-apps-90d", String(apps));
+    set("tp-top8-90d", String(top8));
+    set("tp-tournaments-90d", String(tours));
+    set("tp-last-seen", lastSeen);
+}
+
+/* Compute "Updated Xh ago" label + stale flag for a UTC ISO timestamp. */
+function freshnessLabel(ts) {
+    if (!ts) return { label: "Updated: unknown", hoursAgo: Infinity, stale: true };
+    // Accept "YYYY-MM-DD", "YYYY-MM-DDTHH:MM:SS", "...Z" variants.
+    const s = /Z$/.test(ts) || /[+-]\d\d:?\d\d$/.test(ts) ? ts : ts + "Z";
+    const t = Date.parse(s);
+    if (!Number.isFinite(t)) return { label: `Updated: ${ts}`, hoursAgo: Infinity, stale: true };
+    const hoursAgo = (Date.now() - t) / 3600000;
+    let label;
+    if (hoursAgo < 1)       label = "Updated <1h ago";
+    else if (hoursAgo < 48) label = `Updated ${Math.round(hoursAgo)}h ago`;
+    else                    label = `Updated ${Math.round(hoursAgo / 24)}d ago`;
+    return { label, hoursAgo, stale: hoursAgo > 36 };
+}
+
+function applyStalenessIndicator(container, projAsOf, lastRunAt) {
+    // Use most recent of projection as-of vs last pipeline run as the signal.
+    const candidates = [projAsOf, lastRunAt].filter(Boolean);
+    let pick = null, pickHrs = Infinity;
+    for (const c of candidates) {
+        const f = freshnessLabel(c);
+        if (f.hoursAgo < pickHrs) { pick = f; pickHrs = f.hoursAgo; }
+    }
+    const f = pick || freshnessLabel(null);
+
+    // Mute block when stale.
+    container.style.opacity = f.stale ? "0.65" : "";
+    container.style.filter = f.stale ? "grayscale(0.4)" : "";
+
+    // Inject or update a freshness row at the top of the projection body.
+    let badge = document.getElementById("proj-freshness");
+    if (!badge) {
+        badge = document.createElement("div");
+        badge.id = "proj-freshness";
+        badge.style.cssText =
+            "font-size:11px;padding:4px 8px;margin-bottom:6px;border:1px solid;" +
+            "font-family:inherit;display:flex;align-items:center;gap:6px;";
+        // Insert near the top of the window-body content.
+        const body = container.querySelector(".window-body") || container;
+        body.insertBefore(badge, body.firstChild);
+    }
+    while (badge.firstChild) badge.removeChild(badge.firstChild);
+
+    const icon = document.createElement("span");
+    icon.textContent = f.stale ? "\u26A0" : "\u25CF";  // warn vs dot
+    icon.style.fontWeight = "bold";
+    const text = document.createElement("span");
+    text.textContent = f.stale
+        ? `STALE DATA — ${f.label}. Pipeline may have failed; numbers may be out of date.`
+        : f.label;
+    badge.appendChild(icon);
+    badge.appendChild(text);
+
+    if (f.stale) {
+        badge.style.background = "#fff4d6";
+        badge.style.borderColor = "#c08000";
+        badge.style.color = "#6e4800";
+    } else {
+        badge.style.background = "#eef6ee";
+        badge.style.borderColor = "#6a9a6a";
+        badge.style.color = "#385a38";
     }
 }
 

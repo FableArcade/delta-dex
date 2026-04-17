@@ -48,17 +48,36 @@ class EBayCollector(BaseCollector):
     rate_limit = 5.0  # 5 req/sec burst; daily budget managed separately
     max_retries = 3
 
-    BROWSE_API = "https://api.ebay.com/buy/browse/v1/item_summary/search"
-    TOKEN_URL = "https://api.ebay.com/identity/v1/oauth2/token"
+    # Endpoints auto-switch based on App ID — sandbox keys contain -SBX-,
+    # production keys contain -PRD-. Sandbox returns test data only; real
+    # listings require Production keys (which require marketplace-deletion
+    # compliance or exemption).
+    BROWSE_API_PROD = "https://api.ebay.com/buy/browse/v1/item_summary/search"
+    BROWSE_API_SANDBOX = "https://api.sandbox.ebay.com/buy/browse/v1/item_summary/search"
+    TOKEN_URL_PROD = "https://api.ebay.com/identity/v1/oauth2/token"
+    TOKEN_URL_SANDBOX = "https://api.sandbox.ebay.com/identity/v1/oauth2/token"
     SCOPE = "https://api.ebay.com/oauth/api_scope"
 
-    DAILY_BUDGET = 5000  # eBay Browse API daily call budget
+    DAILY_BUDGET = 6500  # eBay Browse API daily call budget — raised from 5000 to cover ~1,800 new promo cards (Apr 2026)
 
     def __init__(self) -> None:
         super().__init__()
         self._access_token: str | None = None
         self._token_expiry: datetime | None = None
         self._calls_today: int = 0
+        # Auto-detect sandbox vs production from App ID format.
+        app_id = settings.ebay_app_id or ""
+        self._is_sandbox = "-SBX-" in app_id
+        if self._is_sandbox:
+            self.BROWSE_API = self.BROWSE_API_SANDBOX
+            self.TOKEN_URL = self.TOKEN_URL_SANDBOX
+            self.logger.warning(
+                "eBay collector using SANDBOX endpoints — returns test data only, "
+                "not real Pokemon card listings. Swap to Production keys for live data."
+            )
+        else:
+            self.BROWSE_API = self.BROWSE_API_PROD
+            self.TOKEN_URL = self.TOKEN_URL_PROD
 
     # ------------------------------------------------------------------
     # OAuth2 client-credentials
@@ -144,25 +163,23 @@ class EBayCollector(BaseCollector):
 
         params["filter"] = ",".join(filters)
 
-        items: list[dict] = []
-        next_url: str | None = None
-
-        # Paginate (eBay returns max 200 per page)
-        while True:
-            if next_url:
-                resp = self._request(next_url, headers=self._auth_headers())
-            else:
-                resp = self._request(self.BROWSE_API, params=params, headers=self._auth_headers())
-            self._calls_today += 1
-
-            body = resp.json()
-            page_items = body.get("itemSummaries", [])
-            items.extend(page_items)
-
-            # Follow pagination only if we have budget
-            next_url = body.get("next")
-            if not next_url or self._calls_today >= self.DAILY_BUDGET:
-                break
+        # Single page only (200 items) — enough to estimate count/density
+        # for liquidity features. We don't need exhaustive listings; we need
+        # a representative slice per card. The first 200 items are sorted
+        # by relevance + recency, which is what matters for "is this card
+        # liquid right now." Prior implementation paginated through ALL
+        # results (up to ~80 pages for popular cards like Charizard with
+        # 16k listings), burning the daily budget 6-12x over its limit.
+        resp = self._request(self.BROWSE_API, params=params, headers=self._auth_headers())
+        self._calls_today += 1
+        body = resp.json()
+        items = body.get("itemSummaries", [])
+        # Also record the TOTAL count reported by eBay — that's the real
+        # liquidity signal even if we only have 200 items in hand.
+        total_from_api = body.get("total", len(items))
+        if total_from_api and len(items) > 0:
+            # Stash the true total on the first item so aggregator can see it
+            items[0]["_total_from_api"] = total_from_api
 
         return items
 
@@ -193,7 +210,11 @@ class EBayCollector(BaseCollector):
                     prices.append(v)
             return round(sum(prices) / len(prices), 2) if prices else None
 
+        # Use the real total from eBay's response (stashed on first item by
+        # _search_card), not len(items) which is capped at 200 by the API limit.
         total = len(items)
+        if items and "_total_from_api" in items[0]:
+            total = int(items[0]["_total_from_api"])
         return {
             "total": total,
             "raw_count": len(buckets["raw"]),

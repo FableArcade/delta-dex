@@ -8,12 +8,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from api.routers import health, leaderboard, sets, cards, sealed, model
+from api.routers import health, leaderboard, sets, cards, sealed, model, market
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
 app = FastAPI(
-    title="PokeDelta API",
+    title="Delta Dex API",
     description="Data-driven Pokemon TCG investment analytics — Delta Edition",
     version="2.0.0",
 )
@@ -52,6 +52,7 @@ app.include_router(sets.router, prefix="/api", tags=["sets"])
 app.include_router(cards.router, prefix="/api", tags=["cards"])
 app.include_router(sealed.router, prefix="/api", tags=["sealed"])
 app.include_router(model.router, prefix="/api", tags=["model"])
+app.include_router(market.router, prefix="/api", tags=["market"])
 
 
 # Serve frontend static files

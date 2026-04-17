@@ -74,7 +74,7 @@ let evChart = null;
 let currentInterval = "ALL";
 let cardSearchTerm = "";
 let cardRarityFilter = "";
-let cardSort = "raw_desc";
+let cardSort = "psa10_desc";
 
 /* ---- Main loader ---- */
 
@@ -93,7 +93,7 @@ async function init() {
         // Fetch all three endpoints in parallel
         const [setRes, cardsRes, raritiesRes] = await Promise.all([
             fetch(`${API_BASE}/set/${encodeURIComponent(code)}`),
-            fetch(`${API_BASE}/search/cards?setCode=${encodeURIComponent(code)}&sort=raw_desc&limit=500`),
+            fetch(`${API_BASE}/search/cards?setCode=${encodeURIComponent(code)}&sort=psa10_desc&limit=500`),
             fetch(`${API_BASE}/search/rarities?setCode=${encodeURIComponent(code)}`),
         ]);
 
@@ -118,7 +118,7 @@ async function init() {
             `C:\\POKEMON\\${(setData["set-name"] || code).toUpperCase()}.EXE`;
         document.getElementById("taskbar-label").textContent =
             `${(setData["set-name"] || code).substring(0, 20)}`;
-        document.title = `POKEMETRICS - ${setData["set-name"] || code}`;
+        document.title = `DELTADEX - ${setData["set-name"] || code}`;
 
     } catch (err) {
         console.error(err);
@@ -533,9 +533,9 @@ function renderCardsSection() {
                     ${rarityOptions}
                 </select>
                 <select class="win-input" id="card-sort" style="width:140px;">
-                    <option value="raw_desc">Price: High to Low</option>
-                    <option value="raw_asc">Price: Low to High</option>
                     <option value="psa10_desc">PSA 10: High to Low</option>
+                    <option value="raw_desc">Raw: High to Low</option>
+                    <option value="raw_asc">Raw: Low to High</option>
                     <option value="name_asc">Name: A-Z</option>
                     <option value="number_asc">Number: Asc</option>
                 </select>

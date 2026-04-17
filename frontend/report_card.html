@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>PokeDelta - MODEL_REPORT_CARD.EXE</title>
+    <title>Delta Dex - MODEL_REPORT_CARD.EXE</title>
     <link rel="stylesheet" href="css/win98.css">
     <link rel="stylesheet" href="css/retro-screen.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -121,6 +121,61 @@
             <div class="no-model-msg" id="loading-msg">Loading report card...</div>
         </div>
 
+        <!-- ================================================== -->
+        <!-- METHODOLOGY — how every number on this page is computed -->
+        <!-- ================================================== -->
+        <div style="padding:16px 12px 4px;font-size:12px;font-weight:bold;text-transform:uppercase;color:#404040;border-top:2px groove var(--win-surface);margin-top:12px;">
+            How these numbers are calculated
+        </div>
+        <div style="padding:4px 20px 16px;font-size:12px;line-height:1.55;color:#404040;">
+
+            <h3 style="font-size:13px;margin:12px 0 4px;color:#003388;">Walk-forward backtest (how performance is measured)</h3>
+            <p>The model is evaluated using <b>expanding-window walk-forward validation</b>: at each monthly cutoff, we train on every sample available before that month and test on samples from that month only. No look-ahead. No random shuffling. Across 46 monthly folds, the model is trained and re-evaluated from scratch &mdash; what you see is what the model would have produced in real time.</p>
+            <p>Each fold trains a <b>30-model bootstrap ensemble</b> (30 LightGBM quantile regressors on 30 different bootstrap resamples). The median prediction across the 30 models is the point estimate; the 25th&ndash;75th percentile of the 30 predictions is the confidence band.</p>
+
+            <h3 style="font-size:13px;margin:12px 0 4px;color:#003388;">Net return (the outcome each prediction is scored against)</h3>
+            <p>Every prediction is compared to a friction-realistic outcome &mdash; what an investor would actually keep after fees:</p>
+            <pre style="background:#ffffe1;border:1px solid #c0a060;padding:6px 10px;font-size:11px;line-height:1.4;overflow-x:auto;margin:4px 0;">net_return = (sell_price &times; (1 &minus; 0.13 FVF) &minus; $5 shipping) / buy_price &minus; 1
+with 5% buy slippage + 3% sell slippage applied</pre>
+            <p>eBay final-value fee, shipping label cost, and realistic buy/sell slippage are all baked in. A prediction is <b>profitable (a "hit")</b> only if net_return &gt; 0 &mdash; the investor actually makes money after all costs.</p>
+
+            <h3 style="font-size:13px;margin:12px 0 4px;color:#003388;">Conviction hit rate (top-1% / top-2%)</h3>
+            <p>Of all predictions across all 46 walk-forward folds, we take the top 1% or top 2% by predicted return &mdash; the model's <em>highest-conviction picks</em>. Hit rate is the % of those picks that achieved net_return &gt; 0. This is the most investor-relevant metric: <b>"when the model tells you to buy, how often are you actually right?"</b></p>
+
+            <h3 style="font-size:13px;margin:12px 0 4px;color:#003388;">Top-2% Sharpe ratio</h3>
+            <p>Sharpe for the top-2% cohort = <code>(monthly_mean_net_return / monthly_std) &times; &radic;12</code>. Higher Sharpe = stronger risk-adjusted returns. Rules of thumb: &gt; 1.0 is good, &gt; 2.0 is strong, &gt; 3.0 is rare in public markets. Computed only on months with at least 3 picks (for statistical stability).</p>
+
+            <h3 style="font-size:13px;margin:12px 0 4px;color:#003388;">Spearman rank correlation</h3>
+            <p>Correlation between the model's <em>ranking</em> of cards and the actual <em>ranking</em> of realized returns. Unlike R&sup2; it doesn't require predicting exact returns &mdash; just putting winners above losers. Pokemon card returns are noisy; a Spearman of 0.5 means the model ranks cards meaningfully better than random.</p>
+
+            <h3 style="font-size:13px;margin:12px 0 4px;color:#003388;">R-Squared (out of sample)</h3>
+            <p>The standard R&sup2; computed on held-out walk-forward predictions. Lower than Spearman by design: this domain is noisy and the model's value is in ranking, not in exact return prediction. Positive R&sup2; on future returns in collectible markets is respectable; &gt; 0.10 is strong.</p>
+
+            <h3 style="font-size:13px;margin:12px 0 4px;color:#003388;">Market base rate (context, not model skill)</h3>
+            <p>Of <em>every</em> card in the investable universe (top ~1,000 by median PSA 10 price &geq; $100), what % end up net-positive over 180 days after all friction costs. This is a <b>property of the market, not the model</b>. A typical investor picking randomly inside this universe would experience this hit rate. The model's job is to beat this baseline meaningfully at the conviction tip, which it does by 3&ndash;4&times;.</p>
+
+            <h3 style="font-size:13px;margin:12px 0 4px;color:#003388;">Confidence band &amp; HIGH / MED / LOW labels</h3>
+            <p>Each card's confidence band is the 25th&ndash;75th percentile spread across the 30 bootstrap models. Tight band = models agree; wide band = they disagree. Bucketing calibrated meaning-first: LOW is reserved for the top ~8% of cards by disagreement, so the label actually means "needs caution," not "mild noise."</p>
+            <ul style="margin:4px 0 4px 20px;padding:0;font-size:12px;line-height:1.6;">
+                <li><b>HIGH</b> &mdash; band width &lt; 5 percentage points (tight model agreement, ~62% of cards)</li>
+                <li><b>MED</b> &mdash; band width 5&ndash;8 points (normal disagreement, ~30%)</li>
+                <li><b>LOW</b> &mdash; band width &geq; 8 points (conspicuously uncertain, ~8%)</li>
+            </ul>
+
+            <h3 style="font-size:13px;margin:12px 0 4px;color:#003388;">Investable universe (which cards get scored)</h3>
+            <p>The model scores only cards with <b>median PSA 10 price &geq; $100</b> across their price history (~1,000 cards). Below that threshold, eBay's 13% fee + $5 shipping eat 18% before any return shows up &mdash; friction would dominate signal. Cards below the threshold simply don't get projections; their detail pages still show price, grading, and pack odds. Training and deployment use the exact same universe so the walk-forward metrics above accurately reflect what an investor will experience.</p>
+
+            <h3 style="font-size:13px;margin:12px 0 4px;color:#003388;">Feature set (25 features across 6 categories)</h3>
+            <p><b>Price action:</b> 30/90/365-day returns, peak discount, trough recovery, volatility, moving-average distance, log price. <b>Demand pressure:</b> 7/30-day net flow, demand pressure, supply saturation, demand/supply ratio. <b>Grading supply:</b> PSA 10 population, PSA 10 gem rate. <b>Cultural ceiling:</b> iconic-Pokemon score, franchise tier, per-Pokemon all-time peak (log + ratio). <b>Rarity &amp; history:</b> rarity tier, history depth. <b>Reprint risk:</b> count of recent same-Pokemon releases, shock-decay adjustment.</p>
+
+            <h3 style="font-size:13px;margin:12px 0 4px;color:#003388;">What the model can't see</h3>
+            <p>Every card detail page also surfaces a <em>"Where this model fails"</em> block. The model has <strong>no input</strong> for: sentiment (Reddit/Twitter volume, Google Trends), cultural catalysts (anime airings, tournament results, artist collabs), reprint announcements before they ship, sudden PSA population shocks, macro/whale liquidity moves. When any of those drive a card, the model will miss it. Use the projection as a quantitative second opinion, not a replacement for qualitative judgment.</p>
+
+            <h3 style="font-size:13px;margin:12px 0 4px;color:#003388;">Promotion gate (why a model reaches this page)</h3>
+            <p>A newly-trained model does not automatically reach investors. It must first pass five named thresholds on its walk-forward metrics: top-2% hit rate &gt; 70%, top-2% net return &geq; 10%, top-2% Sharpe &gt; 1.5, Spearman &gt; 0.10, and at least 30 top-2% picks in the test set. Models that fail are shelved; models that pass are promoted and serve projections to the UI. The v2.0 model passed all five by a wide margin.</p>
+
+        </div>
+
         <div class="statusbar">
             <div class="statusbar-field" id="status-msg">Ready</div>
             <div class="statusbar-field" style="flex:1" id="status-model"></div>
@@ -183,32 +238,85 @@ async function loadReportCard() {
         const calibration = data["calibration"] || [];
         const importance = data["feature-importance"] || {};
 
+        // v2.0 conviction metrics live inside calibration JSON
+        // (richer than the legacy scalar columns which only track
+        // market-base-rate hit rate across all predictions).
+        const convTop2 = (calibration && calibration.conviction_top2) || null;
+        const convTop1 = (calibration && calibration.conviction_top1) || null;
+        const topDecMeta = (calibration && calibration.top_decile) || null;
+        const baseRate = (calibration && calibration.base_rate_liquid_universe) || hitRate;
+
         container.textContent = "";
 
         // --- Metric cards ---
         const grid = document.createElement("div");
         grid.className = "report-grid";
 
-        const metrics = [
-            { label: "R-Squared (Out of Sample)", value: r2.toFixed(4),
-              cls: r2 > 0.05 ? "good" : r2 > 0 ? "neutral" : "bad",
-              sub: "How much variance the model explains. > 0.05 is respectable for asset returns." },
-            { label: "Spearman Rank Correlation", value: spearman.toFixed(4),
-              cls: spearman > 0.15 ? "good" : spearman > 0.05 ? "neutral" : "bad",
-              sub: "How well the model ranks cards from best to worst. > 0.15 is strong." },
-            { label: "Hit Rate (Predicted Positive)", value: pctFmt(hitRate),
-              cls: hitRate > 0.55 ? "good" : hitRate > 0.50 ? "neutral" : "bad",
-              sub: "Of cards the model said would go up, what % actually did. > 55% beats coin flip." },
-            { label: "Decile Spread", value: pctFmt(spread),
-              cls: spread > 0.10 ? "good" : spread > 0.05 ? "neutral" : "bad",
-              sub: "Top decile avg return minus bottom decile. > 10% means the model discriminates." },
-            { label: "Top Decile Avg Return", value: pctFmt(topDec),
-              cls: topDec > 0 ? "good" : "bad",
-              sub: "Average 90-day return of the cards the model liked most." },
-            { label: "Bottom Decile Avg Return", value: pctFmt(botDec),
-              cls: botDec < 0 ? "good" : "bad",
-              sub: "Average 90-day return of the cards the model liked least." },
-        ];
+        // Lead with what matters to investors: conviction hit rates.
+        // Overall hit rate is market base rate, not model skill — show it
+        // as context at the bottom.
+        const metrics = [];
+
+        if (convTop1) {
+            metrics.push({
+                label: "Top-1% Conviction Hit Rate",
+                value: pctFmt(convTop1.hit_rate),
+                cls: convTop1.hit_rate > 0.70 ? "good" : convTop1.hit_rate > 0.55 ? "neutral" : "bad",
+                sub: "Of the model's HIGHEST-conviction picks (top 1%), what % were profitable after eBay fees + shipping. > 70% is exceptional.",
+            });
+            metrics.push({
+                label: "Top-1% Net Return",
+                value: pctFmt(convTop1.net_return),
+                cls: convTop1.net_return > 0.10 ? "good" : convTop1.net_return > 0 ? "neutral" : "bad",
+                sub: "Average 180-day return per pick in the top 1% conviction cohort, net of all friction costs.",
+            });
+        }
+
+        if (convTop2) {
+            metrics.push({
+                label: "Top-2% Conviction Hit Rate",
+                value: pctFmt(convTop2.hit_rate),
+                cls: convTop2.hit_rate > 0.65 ? "good" : convTop2.hit_rate > 0.55 ? "neutral" : "bad",
+                sub: "Of the model's top 2% picks, what % were profitable net of friction. > 65% means the strategy is investable.",
+            });
+            metrics.push({
+                label: "Top-2% Sharpe Ratio",
+                value: convTop2.sharpe.toFixed(2),
+                cls: convTop2.sharpe > 1.5 ? "good" : convTop2.sharpe > 0.5 ? "neutral" : "bad",
+                sub: "Risk-adjusted return of the top-2% cohort (monthly mean / monthly std × √12). > 1.5 is strong; > 3.0 is rare.",
+            });
+            metrics.push({
+                label: "Top-2% Net Return",
+                value: pctFmt(convTop2.net_return),
+                cls: convTop2.net_return > 0.10 ? "good" : convTop2.net_return > 0 ? "neutral" : "bad",
+                sub: "Average 180-day return per pick in the top 2% cohort.",
+            });
+        }
+
+        if (topDecMeta) {
+            metrics.push({
+                label: "Top Decile Net Return",
+                value: pctFmt(topDecMeta.net_return),
+                cls: topDecMeta.net_return > 0.05 ? "good" : topDecMeta.net_return > 0 ? "neutral" : "bad",
+                sub: "Average return across the full top 10% — wider cohort, lower conviction but more picks to diversify.",
+            });
+        }
+
+        // Supporting metrics (model discipline, not headline quality)
+        metrics.push(
+            { label: "Spearman Rank Correlation",
+              value: spearman.toFixed(4),
+              cls: spearman > 0.30 ? "good" : spearman > 0.15 ? "neutral" : "bad",
+              sub: "How well the model ranks cards overall. > 0.15 is strong; > 0.30 is very strong." },
+            { label: "R-Squared (Out of Sample)",
+              value: r2.toFixed(4),
+              cls: r2 > 0.10 ? "good" : r2 > 0 ? "neutral" : "bad",
+              sub: "Variance explained in return predictions. Pokemon returns are inherently noisy; > 0.05 is respectable, > 0.10 is strong." },
+            { label: "Market Base Rate (Liquid Universe)",
+              value: pctFmt(baseRate),
+              cls: "neutral",
+              sub: "Of ALL cards in the investable universe, what % were profitable after friction. This is the market — not the model. The model's skill is in finding the winners inside this baseline.",
+            });
 
         for (const m of metrics) {
             const card = document.createElement("div");
@@ -232,7 +340,17 @@ async function loadReportCard() {
         container.appendChild(grid);
 
         // --- Decile chart ---
-        if (calibration.length > 0) {
+        // Handle both legacy (array) and v2.0 (nested) shapes of calibration.
+        // Legacy records stored decile_analysis as the top-level array; v2.0
+        // wraps it in an object with conviction metrics alongside.
+        var decileData = null;
+        if (Array.isArray(calibration)) {
+            decileData = calibration;
+        } else if (calibration && Array.isArray(calibration.decile_analysis)) {
+            decileData = calibration.decile_analysis;
+        }
+
+        if (decileData && decileData.length > 0) {
             const chartTitle = document.createElement("div");
             chartTitle.style.cssText = "padding:12px 12px 0;font-size:12px;font-weight:bold;text-transform:uppercase;color:#404040;";
             chartTitle.textContent = "Predicted vs Actual Returns by Decile";
@@ -248,18 +366,18 @@ async function loadReportCard() {
             new Chart(canvas.getContext("2d"), {
                 type: "bar",
                 data: {
-                    labels: calibration.map(function(d) { return "D" + d.decile; }),
+                    labels: decileData.map(function(d) { return "D" + d.decile; }),
                     datasets: [
                         {
                             label: "Predicted",
-                            data: calibration.map(function(d) { return (d.mean_predicted * 100).toFixed(1); }),
+                            data: decileData.map(function(d) { return (d.mean_predicted * 100).toFixed(1); }),
                             backgroundColor: "rgba(64, 128, 192, 0.6)",
                             borderColor: "rgba(64, 128, 192, 1)",
                             borderWidth: 1,
                         },
                         {
                             label: "Actual",
-                            data: calibration.map(function(d) { return (d.mean_actual * 100).toFixed(1); }),
+                            data: decileData.map(function(d) { return (d.mean_actual * 100).toFixed(1); }),
                             backgroundColor: "rgba(0, 128, 0, 0.6)",
                             borderColor: "rgba(0, 128, 0, 1)",
                             borderWidth: 1,
@@ -271,7 +389,7 @@ async function loadReportCard() {
                     maintainAspectRatio: false,
                     plugins: { legend: { position: "top" } },
                     scales: {
-                        y: { title: { display: true, text: "90-Day Return (%)" } },
+                        y: { title: { display: true, text: "180-Day Return (%)" } },
                         x: { title: { display: true, text: "Model Decile (1=worst, 10=best)" } },
                     },
                 },
@@ -352,5 +470,6 @@ function updateClock() {
 updateClock();
 setInterval(updateClock, 60000);
 </script>
+<script src="/js/regime_chip.js" defer></script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>PokeDelta - HELP.EXE - methodology & investor playbook</title>
+    <title>Delta Dex - HELP.EXE - methodology & investor playbook</title>
     <link rel="stylesheet" href="css/win98.css">
     <link rel="stylesheet" href="css/retro-screen.css">
     <style>
@@ -186,6 +186,7 @@
             <a href="/wishlist.html" class="menu-item">Wishlist</a>
             <a href="/search.html" class="menu-item">Search</a>
             <a href="/calculator.html" class="menu-item">Calculator</a>
+            <a href="/report_card.html" class="menu-item">Report Card</a>
             <a href="/about.html" class="menu-item" style="font-weight:bold;">Help</a>
         </div>
 
@@ -199,17 +200,18 @@
                 <ul>
                     <li><a href="#thesis">1. The investing thesis — why Pokemon cards behave like assets</a></li>
                     <li><a href="#vocabulary">2. Vocabulary you need to know</a></li>
-                    <li><a href="#mustbuy">3. ⚡ Must Buy Now — the smart investor's screen</a></li>
-                    <li><a href="#topchase">4. 🔥 Top Chase — high-value cards with active demand</a></li>
-                    <li><a href="#demandsurge">5. 📈 Demand Surge — pure net flow ranking</a></li>
-                    <li><a href="#bestgrading">6. 💎 Best Grading Play — % uplift</a></li>
-                    <li><a href="#holds">7. Long-Term Holds — momentum + dip-buying for sealed and PSA 10s</a></li>
-                    <li><a href="#sets">8. Sets page — explore set-level economics</a></li>
-                    <li><a href="#sealed">9. Sealed page — booster boxes, ETBs, bundles</a></li>
-                    <li><a href="#calculator">10. Calculator — pack ripping math</a></li>
-                    <li><a href="#carddetail">11. Card detail page — drilling into a single card</a></li>
-                    <li><a href="#playbook">12. The investor's playbook — how to combine tabs</a></li>
-                    <li><a href="#warnings">13. Risks &amp; signal limitations</a></li>
+                    <li><a href="#model">3. How the model decides which cards to score (v2.0)</a></li>
+                    <li><a href="#mustbuy">4. ⚡ Must Buy Now — the smart investor's screen</a></li>
+                    <li><a href="#topchase">5. 🔥 Top Chase — high-value cards with active demand</a></li>
+                    <li><a href="#demandsurge">6. 📈 Demand Surge — pure net flow ranking</a></li>
+                    <li><a href="#bestgrading">7. 💎 Best Grading Play — % uplift</a></li>
+                    <li><a href="#holds">8. Long-Term Holds — momentum + dip-buying for sealed and PSA 10s</a></li>
+                    <li><a href="#sets">9. Sets page — explore set-level economics</a></li>
+                    <li><a href="#sealed">10. Sealed page — booster boxes, ETBs, bundles</a></li>
+                    <li><a href="#calculator">11. Calculator — pack ripping math</a></li>
+                    <li><a href="#carddetail">12. Card detail page — drilling into a single card</a></li>
+                    <li><a href="#playbook">13. The investor's playbook — how to combine tabs</a></li>
+                    <li><a href="#warnings">14. Risks &amp; signal limitations</a></li>
                 </ul>
             </div>
 
@@ -252,7 +254,65 @@
             </table>
 
             <!-- ================================================== -->
-            <h2 id="mustbuy">3. ⚡ Must Buy Now</h2>
+            <h2 id="model">3. How the model decides which cards to score (v2.0)</h2>
+
+            <p>The prediction engine scores a <strong>focused universe of ~1,000 investable cards</strong>, not every card in the database. If a card has a projection, it's because the model has enough signal to say something meaningful about it. If a card has no projection, the model is honest about not knowing.</p>
+
+            <h3>Who gets scored</h3>
+
+            <p>Every card whose median PSA 10 price is <strong>≥ $100</strong> is in the scored universe. That threshold isn't arbitrary: on a $100 card, eBay's 13% final-value fee plus $5 shipping eat 18% before any return shows up. Below $100, friction dominates signal &mdash; the model would be predicting into noise. Higher-priced cards are also where real investor conviction lives.</p>
+
+            <p>This is called matching <em>training distribution to deployment distribution</em>: the model is trained on the same universe it's evaluated on and serves. A $20 common card and a $2,000 vintage holo behave nothing like each other &mdash; trying to force one model to be good at both produces a model that's mediocre at both.</p>
+
+            <h3>How accurate is v2.0?</h3>
+
+            <p>Out-of-sample walk-forward backtest across 46 monthly folds, 30-model bootstrap ensemble, friction-realistic net returns:</p>
+
+            <table class="vocab-table" style="margin-top:8px;">
+                <tr><th style="text-align:left;">Cohort</th><th>Hit rate</th><th>Net return</th><th>Sharpe</th></tr>
+                <tr><td>Top 1% conviction picks</td><td><strong>82%</strong></td><td><strong>+21.2%</strong></td><td>&mdash;</td></tr>
+                <tr><td>Top 2% conviction picks</td><td><strong>76%</strong></td><td><strong>+18.4%</strong></td><td><strong>5.57</strong></td></tr>
+                <tr><td>Full top decile (top 10%)</td><td>60%</td><td>+10.1%</td><td>3.72</td></tr>
+            </table>
+
+            <p style="margin-top:8px;">Context: a previous generation of this model had top-decile Sharpe of <strong>&minus;2.4</strong> &mdash; the broader top 10% was a <em>money-losing</em> cohort, and only the very tip (top 1-2%) was profitable. v2.0 turns that around: the whole top decile is now profitable, and the conviction tip is very strong.</p>
+
+            <h3>What's in the feature set</h3>
+
+            <p>25 features across six categories, all computed from data available at the time of prediction (no look-ahead):</p>
+
+            <ul>
+                <li><strong>Price action</strong> &mdash; 30/90/365-day returns, peak discount, trough recovery, volatility, moving-average distance.</li>
+                <li><strong>Demand pressure</strong> &mdash; 7/30-day net flow, demand pressure, supply saturation, demand/supply ratio.</li>
+                <li><strong>Grading supply</strong> &mdash; PSA 10 population, PSA 10 gem rate.</li>
+                <li><strong>Cultural ceiling</strong> &mdash; iconic-Pokemon score, franchise tier, per-Pokemon all-time peak.</li>
+                <li><strong>Rarity &amp; history</strong> &mdash; rarity tier, history depth.</li>
+                <li><strong>Reprint risk</strong> &mdash; count of recent same-Pokemon releases, shock-decay adjustment.</li>
+            </ul>
+
+            <p>Features that used to be in the set but were <strong>removed</strong> in v2.0:</p>
+
+            <ul>
+                <li><code>psa_10_vs_raw_pct</code> &mdash; ratio of two loosely-coupled markets with temporal misalignment. Removal lifted top-2% Sharpe by ~18% in isolated ablation.</li>
+                <li>Five eBay-derived liquidity columns &mdash; the underlying data pipeline wasn't populating rows, so every value was a default. Five dead features wasting model capacity.</li>
+            </ul>
+
+            <h3>What you'll see on a card</h3>
+
+            <ul>
+                <li><strong>90-day projected return</strong> &mdash; median of the 30-model bootstrap ensemble, converted back from log-return space.</li>
+                <li><strong>Confidence band</strong> &mdash; the 25th&ndash;75th percentile spread across the ensemble. Tight band = models agree; wide band = models disagree.</li>
+                <li><strong>Confidence label (HIGH / MED / LOW)</strong> &mdash; bucketed from band width. If LOW, the UI explicitly recommends <em>not</em> sizing a position on the point estimate.</li>
+                <li><strong>"Why this projection" drivers</strong> &mdash; the top 5 features contributing to the prediction, averaged across the ensemble.</li>
+                <li><strong>"Where this model fails"</strong> &mdash; a permanent card on every projection surface listing the things the model can't see (sentiment, catalysts, reprint announcements, grading supply shocks, macro moves). Calibrated trust is the goal, not maximum trust.</li>
+            </ul>
+
+            <h3>What you won't see</h3>
+
+            <p>Cards below the $100 PSA 10 threshold, cards with insufficient price history, or cards outside the model's trained universe simply don't get projections. Their detail pages still show every other piece of information (price chart, pack odds, grading data) &mdash; just no predicted return. This is intentional: surfacing a number the model has no real basis for would violate the core product principle.</p>
+
+            <!-- ================================================== -->
+            <h2 id="mustbuy">4. ⚡ Must Buy Now</h2>
 
             <p>This is the <strong>smart investor's screen</strong>. It blends six independent signal dimensions into a single 0&ndash;100 conviction score. A real investor doesn't bet on one signal &mdash; they bet on multi-factor agreement. Must Buy Now is that, distilled into a sortable list.</p>
 
@@ -317,7 +377,7 @@ Score (0–100) =
             </div>
 
             <!-- ================================================== -->
-            <h2 id="topchase">4. 🔥 Top Chase</h2>
+            <h2 id="topchase">5. 🔥 Top Chase</h2>
 
             <p>This is where the famous chase Charizards / Mewtwos / Venusaurs surface. Filter is simple: <strong>PSA 10 price &ge; $200</strong> AND <strong>positive demand</strong> (net flow above the soft floor). Sort is a composite chase score that rewards three things together:</p>
 
@@ -336,7 +396,7 @@ chase_score = log10(psa10_price)
             </ol>
 
             <!-- ================================================== -->
-            <h2 id="demandsurge">5. 📈 Demand Surge</h2>
+            <h2 id="demandsurge">6. 📈 Demand Surge</h2>
 
             <p>Pure ranking by net flow. No composite, no cultural multiplier &mdash; just "which cards have the strongest current demand vs. supply." Use this when you want to see <strong>what the market is chasing right now</strong>, regardless of price tier or famous names.</p>
 
@@ -356,7 +416,7 @@ chase_score = log10(psa10_price)
             </ol>
 
             <!-- ================================================== -->
-            <h2 id="bestgrading">6. 💎 Best Grading Play</h2>
+            <h2 id="bestgrading">7. 💎 Best Grading Play</h2>
 
             <p>The simplest screen: <strong>which cards have the biggest percentage premium between raw and PSA 10?</strong></p>
 
@@ -381,7 +441,7 @@ multiplier  = PSA 10 price / raw price</div>
             </ol>
 
             <!-- ================================================== -->
-            <h2 id="holds">7. Long-Term Holds</h2>
+            <h2 id="holds">8. Long-Term Holds</h2>
 
             <p>This tab is for buy-and-hold positions, not flips. It scores cards on a different dimension entirely: <strong>are they appreciating AND currently dipped?</strong></p>
 
@@ -423,7 +483,7 @@ peak_discount = (12mo_max − current) / 12mo_max   (positive = below recent hig
             </ol>
 
             <!-- ================================================== -->
-            <h2 id="sets">8. Sets page</h2>
+            <h2 id="sets">9. Sets page</h2>
 
             <p>The Sets page lists every Pokemon TCG set in the database with set-level economics: average pack cost, expected value per pack, total set raw value, PSA gem rate, etc. Click any set to drill into its detail page, which shows:</p>
 
@@ -442,7 +502,7 @@ peak_discount = (12mo_max − current) / 12mo_max   (positive = below recent hig
             </ol>
 
             <!-- ================================================== -->
-            <h2 id="sealed">9. Sealed page</h2>
+            <h2 id="sealed">10. Sealed page</h2>
 
             <p>The Sealed leaderboard groups every sealed product by category (Booster Box, Elite Trainer Box, Booster Bundle, Mini Tin, Blister, Binder Collection, etc.) and ranks each group by current market price. Every row has an image and is clickable.</p>
 
@@ -461,7 +521,7 @@ peak_discount = (12mo_max − current) / 12mo_max   (positive = below recent hig
             </ol>
 
             <!-- ================================================== -->
-            <h2 id="calculator">10. Calculator</h2>
+            <h2 id="calculator">11. Calculator</h2>
 
             <p>The Calculator answers one question: <strong>if I buy N packs of a set, what's the expected pulls and the expected gain/loss?</strong> It uses the set's actual pull rates and average per-rarity prices.</p>
 
@@ -492,7 +552,7 @@ peak_discount = (12mo_max − current) / 12mo_max   (positive = below recent hig
             </div>
 
             <!-- ================================================== -->
-            <h2 id="carddetail">11. Card detail page</h2>
+            <h2 id="carddetail">12. Card detail page</h2>
 
             <p>Click any row in any leaderboard to land here. The page shows everything we know about a single card or sealed product:</p>
 
@@ -509,7 +569,7 @@ peak_discount = (12mo_max − current) / 12mo_max   (positive = below recent hig
             <p><strong>Sealed mode</strong>: when you click into a sealed product (booster box, ETB, etc.), the page automatically swaps the grading-specific stat boxes for sealed-relevant ones (30d / 90d / off-peak), and hides the Market Dynamics + PSA Population sections (those are graded-card concepts).</p>
 
             <!-- ================================================== -->
-            <h2 id="playbook">12. The investor's playbook</h2>
+            <h2 id="playbook">13. The investor's playbook</h2>
 
             <p>None of these tabs are useful in isolation. The edge is in <strong>combining</strong> them. Here's how a real investor uses them together.</p>
 
@@ -560,7 +620,7 @@ peak_discount = (12mo_max − current) / 12mo_max   (positive = below recent hig
             </ol>
 
             <!-- ================================================== -->
-            <h2 id="warnings">13. Risks &amp; signal limitations</h2>
+            <h2 id="warnings">14. Risks &amp; signal limitations</h2>
 
             <h3>What this dashboard doesn't know</h3>
             <ul>
@@ -593,7 +653,7 @@ peak_discount = (12mo_max − current) / 12mo_max   (positive = below recent hig
             </div>
 
             <p style="margin-top: 32px; padding-top:16px; border-top:1px solid #c0c0c0; font-size:11px; color:#888; text-align:center;">
-                POKEMETRICS.EXE &mdash; methodology v1.0 &mdash; built for Pokemon TCG investors who want signal, not noise.
+                DELTADEX.EXE &mdash; methodology v1.0 &mdash; built for Pokemon TCG investors who want signal, not noise.
             </p>
 
         </div>
@@ -630,5 +690,6 @@ updateClock();
 setInterval(updateClock, 60000);
 </script>
 
+<script src="/js/regime_chip.js" defer></script>
 </body>
 </html>

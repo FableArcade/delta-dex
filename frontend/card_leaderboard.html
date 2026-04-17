@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>PokeDelta - OPPORTUNITY_FINDER.EXE - undervalued &amp; overvalued cards</title>
+    <title>Delta Dex - OPPORTUNITY_FINDER.EXE - undervalued &amp; overvalued cards</title>
     <link rel="stylesheet" href="css/win98.css">
     <link rel="stylesheet" href="css/retro-screen.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -40,10 +40,12 @@
             background: #dfdfdf;
         }
         .opp-tab.holds.active        { color: #003388; }
+        .opp-tab.buythedip.active    { color: #004080; background: #d8e8ff; }
         .opp-tab.mustbuy.active      { color: #806000; background: #fff6d8; }
         .opp-tab.topchase.active     { color: #800040; background: #ffe4f0; }
         .opp-tab.demandsurge.active  { color: #004080; background: #e4f0ff; }
         .opp-tab.bestgrading.active  { color: #006400; background: #e8ffe8; }
+        .opp-tab.buythedip,
         .opp-tab.mustbuy,
         .opp-tab.topchase,
         .opp-tab.demandsurge,
@@ -52,6 +54,7 @@
         .opp-controls-ev,
         .opp-controls-holds,
         .opp-controls-mustbuy,
+        .opp-controls-buythedip,
         .opp-controls-sentiment {
             display: flex;
             flex-wrap: wrap;
@@ -129,7 +132,7 @@
             height: 4px;
         }
 
-        /* Per-cell hover tooltip — used to expose Must Buy Now component
+        /* Per-cell hover tooltip — used to expose Top Picks component
            breakdown when hovering the score chip. CSS-only, multi-line. */
         [data-tip] {
             position: relative;
@@ -329,7 +332,7 @@
                     <div class="hero-title">opportunity finder</div>
                     <div class="hero-subtitle">
                         composite conviction scoring across grading math, market sentiment, scarcity &amp; momentum.
-                        start at <b>Must Buy Now</b> for strongest picks, or drill into specific frames with the other tabs.
+                        start at <b>Top Picks</b> for strongest picks, or drill into specific frames with the other tabs.
                     </div>
                 </div>
             </div>
@@ -344,6 +347,7 @@
                 <button class="era-btn"        data-era="swsh"  style="height:24px;padding:0 10px;background:var(--win-surface);box-shadow:var(--bevel-raised);border:none;cursor:pointer;font-family:inherit;font-size:11px;">Sword &amp; Shield (2020-22)</button>
                 <button class="era-btn"        data-era="sm"    style="height:24px;padding:0 10px;background:var(--win-surface);box-shadow:var(--bevel-raised);border:none;cursor:pointer;font-family:inherit;font-size:11px;">Sun &amp; Moon (2017-19)</button>
                 <button class="era-btn"        data-era="xy"    style="height:24px;padding:0 10px;background:var(--win-surface);box-shadow:var(--bevel-raised);border:none;cursor:pointer;font-family:inherit;font-size:11px;">XY &amp; Earlier (pre-2017)</button>
+                <button class="era-btn"        data-era="promo" style="height:24px;padding:0 10px;background:var(--win-surface);box-shadow:var(--bevel-raised);border:none;cursor:pointer;font-family:inherit;font-size:11px;">Promo (all regions)</button>
             </div>
             <span id="era-count" style="font-size:10px;color:#606060;margin-left:auto;"></span>
         </div>
@@ -351,7 +355,8 @@
         <!-- Toolbar: tabs + controls -->
         <div class="opp-toolbar">
             <div class="opp-tabs">
-                <button class="opp-tab mustbuy active"    data-view="mustbuy">&#9889; Must Buy Now</button>
+                <button class="opp-tab buythedip active"  data-view="buythedip">&#8600; Buy the Dip</button>
+                <button class="opp-tab mustbuy"           data-view="mustbuy">&#9889; Top Picks</button>
                 <button class="opp-tab topchase"          data-view="topchase">&#128293; Top Chase</button>
                 <button class="opp-tab demandsurge"       data-view="demandsurge">&#128200; Demand Surge</button>
                 <button class="opp-tab bestgrading"       data-view="bestgrading">&#128142; Best Grading Play</button>
@@ -387,8 +392,28 @@
                 <span class="opp-formula-note">Real EV: <code>gem%&nbsp;×&nbsp;PSA10 + p9&nbsp;×&nbsp;PSA9 + p8&nbsp;×&nbsp;PSA8 − $25 fee − raw</code>. Only cards with EV&nbsp;&gt;&nbsp;0 shown. <code>~</code> on gem% = PSA pop data missing (conservative 10% assumed).</span>
             </div>
 
-            <!-- Controls specific to Must Buy Now view (smart-investor composite) -->
-            <div class="opp-controls-mustbuy">
+            <!-- Controls specific to Buy the Dip view -->
+            <div class="opp-controls-buythedip">
+                <div class="opp-control" title="Minimum PSA 10 price. Default $10.">
+                    <label for="dip-min-psa10">Min PSA 10 $</label>
+                    <input type="number" id="dip-min-psa10" min="0" max="10000" step="5" value="10">
+                </div>
+                <div class="opp-control" title="Minimum dip from all-time high. 20% = at least 20% below ATH.">
+                    <label for="dip-min-dippct">Min dip %</label>
+                    <input type="range" id="dip-min-dippct" min="0.10" max="0.80" step="0.05" value="0.20">
+                    <span id="dip-min-dippct-val" style="font-weight:bold;min-width:28px;text-align:right;">20%</span>
+                </div>
+                <div class="opp-control" title="Minimum dip score (0-100).">
+                    <label for="dip-min-score">Min score</label>
+                    <input type="range" id="dip-min-score" min="0" max="80" step="5" value="30">
+                    <span id="dip-min-score-val" style="font-weight:bold;min-width:28px;text-align:right;">30</span>
+                </div>
+                <span class="opp-philosophy">Dip hunting: cards fallen from ATH with reversal signals</span>
+                <span class="opp-formula-note">Score = 50% dip depth (% off all-time high) + 15% supply tightening + 15% net flow reversal + 10% price recovering + 10% cultural floor. Gated: ≥20% off ATH, supply sat &lt; 1, positive net flow.</span>
+            </div>
+
+            <!-- Controls specific to Top Picks view (smart-investor composite) -->
+            <div class="opp-controls-mustbuy" style="display:none;">
                 <div class="opp-control" title="Minimum smart-investor score. 50 = solid pick, 65 = strong conviction, 75+ = high conviction.">
                     <label for="mustbuy-min-score">Min score</label>
                     <input type="range" id="mustbuy-min-score" min="0" max="100" step="5" value="50">
@@ -403,6 +428,10 @@
                 <div class="opp-control" title="Minimum PSA 10 price for chase tier. Lower = bigger list. Default $200.">
                     <label for="topchase-min-psa10">Min PSA 10 $</label>
                     <input type="number" id="topchase-min-psa10" min="0" max="20000" step="25" value="200">
+                </div>
+                <div class="opp-control" title="Maximum PSA 10 price — caps the universe so the ultra-premium grails don't crowd out affordable chases. Leave blank for no cap.">
+                    <label for="topchase-max-psa10">Max PSA 10 $</label>
+                    <input type="number" id="topchase-max-psa10" min="0" max="100000" step="100" placeholder="no cap">
                 </div>
                 <span class="opp-philosophy">Grail tracker: expensive cards with active demand</span>
                 <span class="opp-formula-note">Chase = <code>√(psa10/100) × (1 + nf30% × 2) × (1 + cultural × 0.8)</code>. Rewards expensive grails, normalized demand, and iconic names (no listing-count bias).</span>
@@ -497,5 +526,6 @@ updateClock();
 setInterval(updateClock, 60000);
 </script>
 
+<script src="/js/regime_chip.js" defer></script>
 </body>
 </html>

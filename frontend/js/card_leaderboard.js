@@ -25,7 +25,7 @@ const API_BASE = "/api";
 // --- state ---
 let allCards = [];
 let modelProjections = {};  // card_id -> projection data from /api/model/projections
-let currentEra = "all";     // "all" | "sv" | "swsh" | "sm" | "xy"
+let currentEra = "all";     // "all" | "sv" | "swsh" | "sm" | "xy" | "promo"
 
 // Era classification by set_code. Used by era filter to group cards
 // into Pokemon TCG generations.
@@ -49,10 +49,15 @@ const SET_ERAS = {
     xy: new Set([
         "EVO", "GEN",
     ]),
+    // Promo — regional + Black Star promotional sets (all eras)
+    promo: new Set([
+        "PROMO", "KRP", "JPP",
+    ]),
 };
 
 function cardEra(card) {
     const setCode = card["set-code"];
+    if (SET_ERAS.promo.has(setCode)) return "promo";
     if (SET_ERAS.sv.has(setCode)) return "sv";
     if (SET_ERAS.swsh.has(setCode)) return "swsh";
     if (SET_ERAS.sm.has(setCode)) return "sm";
@@ -60,7 +65,7 @@ function cardEra(card) {
     return "unknown";
 }
 
-let view = "mustbuy";  // "mustbuy" | "undervalued" | "overvalued" | "holds" | "all"
+let view = "buythedip";  // "buythedip" | "mustbuy" | "topchase" | "demandsurge" | "bestgrading" | "holds"
 
 // Constants used by computeEvScore (which feeds into Must Buy Now's hard gates).
 // No UI to tweak these now — Must Buy Now uses fixed defaults so the score is
@@ -91,7 +96,7 @@ const HOLDS_MIN_MOMENTUM   = 0.03;     // 3% real appreciation over anchor windo
 const HOLDS_MIN_SEALED_SCORE = 0.08;   // 8% composite score minimum for sealed
 
 // Must-buy view knobs (smart-investor composite score, 0-100)
-let mustBuyMinScore = 50;       // default min composite score to qualify
+let mustBuyMinScore = 50;       // default min score — v3.2 additive (model 35 + cultural/demand/scarcity/momentum/grading + setup kicker)
 // Cultural hard gate: 0.15 requires EITHER an iconic Pokemon name match
 // OR a chase rarity ≥ Special Illustration Rare (0.20). Basic Energy cards
 // with only a Hyper Rare rarity bonus (0.12) fall below this — correctly,
@@ -106,6 +111,7 @@ const MUSTBUY_MIN_CULTURAL = 0.15;
 // ranking is done by the score formula; this gate only drops the worst
 // outliers so they don't pollute the tail.
 let chaseMinPsa10 = 200;    // floor for "chase tier" — still investable
+let chaseMaxPsa10 = null;   // optional cap; null = no ceiling
 let chaseMinDemand = -0.005;
 
 // Demand Surge view knobs.
@@ -127,11 +133,26 @@ let dsMinNfPct = 0.010;  // 1.0% daily = ~7% weekly absorption
 let bgMinPsa10 = 100;
 let bgMinRaw = 30;
 
+// Buy the Dip view knobs
+let dipMinPsa10 = 10;
+let dipMinDipPct = 0.20;   // 20% off ATH minimum
+let dipMinScore = 30;
+
 let displayedCount = 0;
 const PAGE_SIZE = 100;
 
 // Sort state — different defaults per view family
-let currentSort = { key: "mbscore", dir: "desc" };
+// Default sort: model projection descending when projections are loaded,
+// otherwise fall back to mbscore. The init routine (line ~2165) upgrades
+// this to "proj" once the /model/projections fetch completes. We start
+// with mbscore so the table isn't empty-ranked if the model endpoint is
+// unreachable.
+//
+// Why proj, not mbscore? The 26-month blind historical test showed
+// ranking by projected_return earned +102% cumulative vs -12% for the
+// old composite. Pure model ranking is the investor-optimal default;
+// users can still toggle to "MB Score" via the column header.
+let currentSort = { key: "dipscore", dir: "desc" };
 
 // Current filtered list (cached so Load More and column sort don't re-fetch)
 let _currentList = [];
@@ -675,23 +696,138 @@ function computeMustBuyScore(card) {
         else                   gradingValue = 0.30 + 0.70 * (roi / 1.00); // 0→0.30, 1.00→1.0
     }
 
-    // ---- Weighted composite (5 dimensions, sum to 100) ----
-    const score = Math.round(
-        cultural     * 15 +
-        demand       * 25 +
-        scarcity     * 25 +
-        momentum     * 15 +
-        gradingValue * 20
-    );
+    // ---- 6. Model investment signal — the primary scoring axis ----
+    //
+    // Must Buy asks the same question as Pure ROI ("what are the best
+    // investments right now?") with one extra constraint: you can actually
+    // execute the trade today. We start from the Pure ROI formula exactly,
+    // then multiply by an "actionability" factor (demand + supply) so model
+    // picks that are saturated or have no buyers circling fall lower than
+    // equally-projected picks that are primed to move.
+    //
+    //   base          = modelScore × confMult × confLowBonus       (0..~1.3)
+    //   actionability = 0.60 + 0.40 × (0.5·demand + 0.5·supplyTight)  (0.6..1.0)
+    //   score         = clamp01(base × actionability) × 100
+    //
+    // projected_return <  0  → model is bearish → modelScore capped at 0.10 so
+    //                          the card is pushed to the bottom regardless of
+    //                          cultural / demand readings.
+
+    let modelProj = null, modelConfLow = null, modelConfHigh = null, modelConfWidth = null;
+    let baseRoi = null;
+    let modelScore = null, confMult = null, confLowBonus = null;
+    if (typeof modelProjections !== "undefined") {
+        const proj = modelProjections[card.id];
+        if (proj) {
+            modelProj = Number(proj["projected-return"]);
+            modelConfLow = numOrNull(proj["confidence-low"]);
+            modelConfHigh = numOrNull(proj["confidence-high"]);
+            modelConfWidth = numOrNull(proj["confidence-width"]);
+            if (Number.isFinite(modelProj)) {
+                if (modelProj < 0) {
+                    modelScore = Math.max(0, 0.10 + modelProj);
+                } else {
+                    modelScore = clamp01(modelProj / 0.30);
+                }
+                confMult = modelConfWidth == null ? 0.7
+                         : modelConfWidth < 0.15 ? 1.0
+                         : modelConfWidth < 0.30 ? 0.7
+                         : 0.4;
+                confLowBonus = (modelConfLow != null && modelConfLow > 0) ? 1.20 : 1.00;
+                baseRoi = modelScore * confMult * confLowBonus;
+            }
+        }
+    }
+
+    let score;
+    let setupSignals = null;
+    let setupBonus = 0;
+    if (baseRoi !== null) {
+        // v3.2 — additive composite. Every signal contributes bounded points
+        // to a 0..100 scale. No multiplicative cascades. Weights:
+        //   model        35   ← same baseRoi math that powers Pure ROI
+        //   cultural     15   ← brand floor (sticky demand over years)
+        //   demand       15   ← net flow momentum
+        //   scarcity     15   ← pop + supply tight + price stable
+        //   momentum     10   ← chart trajectory
+        //   gradingValue 10   ← EV after grading fee
+        //   setupBonus  0-10  ← classic reversal-pattern kicker
+        //                       (rising demand + tight supply + reversal
+        //                        + off-peak dip, 2.5 pts each)
+
+        // --- Setup-pattern signals (0 or 1 each; 5 signals × 3 pts = 15 max) ---
+        const isRisingDemand =
+            (nf30Pct != null && nf30Pct > 0) &&
+            (nf7Pct != null && nf7Pct > nf30Pct)
+            ? 1 : 0;
+        const isTightSupply = (satIdx != null && satIdx <= 0.75) ? 1 : 0;
+        const isReversal =
+            trajectory === "rebound" || trajectory === "thin-rising" ||
+            (a90 != null && a90 > 0 && psa10 > a30 && a30 <= a90)
+            ? 1 : 0;
+        const isOffPeak = (max1y != null && psa10 > 0
+                           && (max1y - psa10) / max1y >= 0.15) ? 1 : 0;
+
+        // Widening PSA10/raw spread — early popularity signal. When hype starts,
+        // investor market (PSA 10) reacts faster than player market (raw), and
+        // the spread expands. We look at 30-day change, require ≥10% widening,
+        // and require both price points are real (not null/zero). This is the
+        // DERIVATIVE of the point-in-time ratio we removed as a collider —
+        // trends cancel the noise that makes the level untrustworthy.
+        const raw30 = numOrNull(card["raw-30d-ago"]);
+        const isSpreadWidening = (
+            raw !== null && raw > 0 &&
+            raw30 !== null && raw30 > 0 &&
+            a30 !== null && a30 > 0 &&
+            psa10 > 0 &&
+            (psa10 / raw) > (a30 / raw30) * 1.10
+        ) ? 1 : 0;
+
+        const setupCount = isRisingDemand + isTightSupply + isReversal +
+                           isOffPeak + isSpreadWidening;
+        setupBonus = setupCount * 3;     // max 15 pts across 5 signals
+        setupSignals = {
+            isRisingDemand, isTightSupply, isReversal, isOffPeak, isSpreadWidening,
+        };
+
+        // baseRoi maps roughly onto 0..1.32; bring it back onto a 0..1 scale
+        // before multiplying by the 35-pt budget so the bound is preserved.
+        const modelPts = clamp01(baseRoi) * 35;
+
+        // Composite weights (2026-04-16 reweight):
+        //   model 35 · cultural 15 · demand 15 · scarcity 20 · momentum 10
+        //   setup bonus 0-15 · (grading value REMOVED — irrelevant for PSA 10 buys)
+        const composite = modelPts
+                  + cultural     * 15
+                  + demand       * 15
+                  + scarcity     * 20
+                  + momentum     * 10
+                  + setupBonus;
+        score = Math.round(Math.min(110, composite));
+    } else {
+        // Fallback for cards the model hasn't projected — pre-model
+        // heuristic composite, capped at 50 so model-backed cards always
+        // rank above conviction-less picks.
+        const heuristic = Math.round(
+            cultural * 15 +
+            demand   * 25 +
+            scarcity * 35 +
+            momentum * 25
+        );
+        score = Math.min(50, heuristic);
+    }
 
     card._mbScore = score;
     card._mbComps = {
-        cultural, demand, scarcity, momentum, gradingValue,
+        cultural, demand, scarcity, momentum, gradingValue, modelScore,
+        // Scoring pathway metadata for the tooltip
+        baseRoi, confMult, confLowBonus, setupBonus, setupSignals,
         // Sub-components for the breakdown tooltip
         popScarce, supplyTight, priceStable, alignmentPenalty,
         nf7Pct, nf30Pct, dem, sup, pop, satIdx, gemPct,
         ev: evForDisplay, roi: roiForDisplay,
         trajectory,
+        modelProj, modelConfLow, modelConfHigh, modelConfWidth,
     };
 }
 
@@ -779,6 +915,7 @@ function filterTopChase() {
         if (c["is-sealed"]) continue;
         const psa10 = Number(c["psa-10-price"]);
         if (!Number.isFinite(psa10) || psa10 < chaseMinPsa10) continue;
+        if (chaseMaxPsa10 != null && psa10 > chaseMaxPsa10) continue;
         const nfPct = Number(c["net-flow-pct-30d"]);
         if (Number.isFinite(nfPct) && nfPct < chaseMinDemand) continue;
         // Attach projection data
@@ -896,7 +1033,100 @@ function filterHolds() {
     return out;
 }
 
+// --- Buy the Dip ---
+
+function computeDipScore(card) {
+    card._dipScore = null;
+    card._dipComps = null;
+    if (card["is-sealed"]) return;
+
+    const numOrNull = (v) => (v === null || v === undefined || v === "") ? null : Number(v);
+    const clamp01 = v => Math.max(0, Math.min(1, v));
+
+    const psa10 = numOrNull(card["psa-10-price"]);
+    if (psa10 === null || psa10 < dipMinPsa10) return;
+
+    const ath = numOrNull(card["psa10-ath"]);
+    if (ath === null || ath <= 0) return;
+
+    const dipPct = (ath - psa10) / ath;
+    if (dipPct < dipMinDipPct) return;
+
+    // Soft gate: if sat data exists and is >= 1, penalize but don't exclude.
+    // Cards without market data still qualify on dip + price recovery alone.
+    const satIdx = numOrNull(card["supply-saturation-index"]);
+
+    const nf7  = numOrNull(card["net-flow-7d"]);
+    const nf30 = numOrNull(card["net-flow-30d"]);
+    const nf7Pct  = numOrNull(card["net-flow-pct-7d"]);
+    const nf30Pct = numOrNull(card["net-flow-pct-30d"]);
+
+    // 1. Dip depth (50 pts) — 20% off = 0, 80%+ off = 50
+    const dipDepth = clamp01((dipPct - 0.20) / 0.60) * 50;
+
+    // 2. Supply signal (10 pts) — bonus when sat data exists and is tight
+    let supplyScore = 0;
+    if (satIdx !== null) {
+        supplyScore = satIdx < 1 ? clamp01(1.0 - satIdx) * 10 : 0;
+    }
+
+    // 3. Net flow reversal (10 pts) — bonus when flow data exists and is positive
+    const nf7Norm  = nf7Pct  !== null ? clamp01((nf7Pct  + 0.01) / 0.05) : 0;
+    const nf30Norm = nf30Pct !== null ? clamp01((nf30Pct + 0.01) / 0.05) : 0;
+    const flowScore = (nf7Norm * 0.40 + nf30Norm * 0.60) * 10;
+
+    // 4. Price recovering (20 pts) — the key "slight reversal" signal.
+    //    Current > 30d ago means price is climbing off a bottom.
+    //    Current > 1y min means we're not AT the floor (falling knife).
+    //    Partial credit: 10 pts for each condition met.
+    const a30   = numOrNull(card["psa10-30d-ago"]);
+    const min1y = numOrNull(card["psa10-min-1y"]);
+    let recoverScore = 0;
+    const priceUp   = a30 !== null && a30 > 0 && psa10 > a30;
+    const offBottom = min1y !== null && psa10 > min1y;
+    if (priceUp)   recoverScore += 10;
+    if (offBottom) recoverScore += 10;
+
+    // 5. Cultural floor (10 pts)
+    const cultural = culturalImpactScore(card);
+    const culturalScore = cultural * 10;
+
+    const score = Math.round(dipDepth + supplyScore + flowScore + recoverScore + culturalScore);
+    card._dipScore = score;
+    card._dipComps = {
+        dipPct, dipDepth, supplyScore, flowScore, recoverScore,
+        culturalScore, cultural, satIdx, nf7Pct, nf30Pct,
+        ath, priceUp, offBottom,
+    };
+}
+
+function filterBuyTheDip() {
+    const out = [];
+    for (const c of allCards) {
+        if (!Number.isFinite(c._dipScore)) continue;
+        if (c._dipScore < dipMinScore) continue;
+        out.push(c);
+    }
+    return out;
+}
+
 // --- sort ---
+
+function getSortValueDip(card, key) {
+    switch (key) {
+        case "name":      return (card["product-name"] || "").toLowerCase();
+        case "set":       return (card["set-code"] || "").toLowerCase();
+        case "psa10":     return Number(card["psa-10-price"]) || 0;
+        case "ath":       return Number(card["psa10-ath"]) || 0;
+        case "athdate":   return card["psa10-ath-date"] || "";
+        case "dippct":    return card._dipComps ? card._dipComps.dipPct : 0;
+        case "satidx":    return Number(card["supply-saturation-index"]) || 0;
+        case "nf7":       return Number(card["net-flow-pct-7d"]) || -Infinity;
+        case "nf30":      return Number(card["net-flow-pct-30d"]) || -Infinity;
+        case "dipscore":  return Number.isFinite(card._dipScore) ? card._dipScore : -Infinity;
+        default:           return 0;
+    }
+}
 
 function getSortValueBestGrading(card, key) {
     switch (key) {
@@ -982,12 +1212,13 @@ function getSortValueHold(card, key) {
 function sortList(list) {
     const { key, dir } = currentSort;
     const getter =
+        view === "buythedip"   ? getSortValueDip :
         view === "holds"       ? getSortValueHold :
         view === "mustbuy"     ? getSortValueMustBuy :
         view === "topchase"    ? getSortValueTopChase :
         view === "demandsurge" ? getSortValueDemandSurge :
         view === "bestgrading" ? getSortValueBestGrading :
-                                  getSortValueMustBuy;  // safe fallback
+                                  getSortValueDip;  // safe fallback
     list.sort((a, b) => {
         const av = getter(a, key);
         const bv = getter(b, key);
@@ -1001,6 +1232,20 @@ function sortList(list) {
 // --- table header rendering (per-view) ---
 
 const HEADERS = {
+    buythedip: [
+        { key: "rank",     label: "#",          width: 50 },
+        { key: "none",     label: "IMAGE",      width: 60 },
+        { key: "name",     label: "CARD NAME" },
+        { key: "set",      label: "SET" },
+        { key: "psa10",    label: "PSA 10" },
+        { key: "ath",      label: "ATH" },
+        { key: "athdate",  label: "ATH DATE" },
+        { key: "dippct",   label: "DIP %" },
+        { key: "satidx",   label: "SAT IDX" },
+        { key: "nf7",      label: "NF 7D %" },
+        { key: "nf30",     label: "NF 30D %" },
+        { key: "dipscore", label: "DIP SCORE" },
+    ],
     holds: [
         { key: "rank",     label: "#",         width: 50 },
         { key: "none",     label: "IMAGE",     width: 60 },
@@ -1068,12 +1313,13 @@ const HEADERS = {
 function renderThead() {
     const thead = document.getElementById("card-thead");
     const cols =
+        view === "buythedip"   ? HEADERS.buythedip :
         view === "holds"       ? HEADERS.holds :
         view === "mustbuy"     ? HEADERS.mustbuy :
         view === "topchase"    ? HEADERS.topchase :
         view === "demandsurge" ? HEADERS.demandsurge :
         view === "bestgrading" ? HEADERS.bestgrading :
-                                  HEADERS.mustbuy;  // safe fallback
+                                  HEADERS.buythedip;  // safe fallback
     const tr = document.createElement("tr");
     for (const col of cols) {
         const th = document.createElement("th");
@@ -1091,6 +1337,79 @@ function renderThead() {
 }
 
 // --- row rendering (per-view) ---
+
+function renderRowsBuyTheDip(list, start, count) {
+    const tbody = document.getElementById("card-tbody");
+    if (start === 0) tbody.innerHTML = "";
+    const end = Math.min(start + count, list.length);
+    for (let i = start; i < end; i++) {
+        const c = list[i];
+        const d = c._dipComps || {};
+        const imgUrl = esc(c["image-url"] || "");
+        const cardId = c.id || "";
+        const setCode = esc(c["set-code"] || "");
+        const name    = esc(c["product-name"] || "\u2014");
+        const psa10   = Number(c["psa-10-price"]) || 0;
+        const athVal  = Number(c["psa10-ath"]) || 0;
+        const athDate = c["psa10-ath-date"] || "\u2014";
+        const dipPct  = d.dipPct || 0;
+        const satIdx  = d.satIdx;
+        const nf7Pct  = d.nf7Pct;
+        const nf30Pct = d.nf30Pct;
+        const score   = Number(c._dipScore);
+
+        const tr = document.createElement("tr");
+        tr.className = "rowLink";
+        tr.dataset.href = `/card.html?id=${encodeURIComponent(cardId)}`;
+        tr.onclick = function(e) {
+            if (!e.target.closest("a")) window.location = this.dataset.href;
+        };
+
+        const dipPctStr = (dipPct * 100).toFixed(1) + "%";
+        const dipCls = dipPct >= 0.50 ? "mb-chip tier-strong"
+                     : dipPct >= 0.30 ? "mb-chip tier-solid"
+                                      : "mb-chip tier-weak";
+
+        const satStr = satIdx !== null ? satIdx.toFixed(2) : "\u2014";
+        const satCls = satIdx !== null && satIdx < 0.60 ? "ev-chip pos"
+                     : satIdx !== null && satIdx < 0.85 ? "ev-chip zero"
+                                                        : "ev-chip neg";
+
+        const fmtNf = (v) => {
+            if (v === null || !Number.isFinite(v)) return "\u2014";
+            return (v >= 0 ? "+" : "") + (v * 100).toFixed(1) + "%";
+        };
+        const nfCls = (v) => {
+            if (v === null || !Number.isFinite(v)) return "chip chip-neu";
+            return v > 0.005 ? "chip chip-pos" : v < -0.005 ? "chip chip-neg" : "chip chip-neu";
+        };
+
+        const scoreCls =
+            score >= 60 ? "mb-chip tier-strong" :
+            score >= 40 ? "mb-chip tier-solid"  :
+                          "mb-chip tier-weak";
+
+        // All values are escaped via esc() or are numeric. innerHTML pattern
+        // matches existing codebase (renderRowsMustBuy, renderRowsHolds, etc).
+        tr.innerHTML = `
+            <td class="text-center"><span class="${esc(rankClass(i + 1))}">${i + 1}</span></td>
+            <td>${imgUrl ? `<img src="${esc(imgUrl)}" alt="" style="width:50px;height:70px;object-fit:contain;image-rendering:auto;" loading="lazy">` : "\u2014"}</td>
+            <td>${name}</td>
+            <td>${setCode}</td>
+            <td class="text-right text-mono">${money(psa10)}</td>
+            <td class="text-right text-mono" style="color:#606060;">${money(athVal)}</td>
+            <td class="text-right" style="font-size:10px;color:#808080;">${esc(athDate)}</td>
+            <td class="text-right"><span class="${esc(dipCls)}">${dipPctStr}</span></td>
+            <td class="text-right"><span class="${esc(satCls)}">${satStr}</span></td>
+            <td class="text-right"><span class="${esc(nfCls(nf7Pct))}">${fmtNf(nf7Pct)}</span></td>
+            <td class="text-right"><span class="${esc(nfCls(nf30Pct))}">${fmtNf(nf30Pct)}</span></td>
+            <td class="text-right"><span class="${esc(scoreCls)}">${Number.isFinite(score) ? score : "\u2014"}</span></td>
+        `;
+        tbody.appendChild(tr);
+    }
+    displayedCount = end;
+    updateLoadMore(list);
+}
 
 function renderRowsBestGrading(list, start, count) {
     const tbody = document.getElementById("card-tbody");
@@ -1298,27 +1617,46 @@ function buildMustBuyBreakdown(c) {
     const alignNote = m.alignmentPenalty < 1 ? `  (×${m.alignmentPenalty.toFixed(2)} misalign penalty)` : "";
     const evStr    = Number.isFinite(m.ev) ? (m.ev >= 0 ? "+$" : "-$") + Math.abs(m.ev).toFixed(0) : "—";
     const roiStr   = Number.isFinite(m.roi) ? (m.roi >= 0 ? "+" : "") + (m.roi * 100).toFixed(0) + "%" : "—";
+    const hasProj = m.baseRoi !== null && m.baseRoi !== undefined;
+    if (hasProj) {
+        const confLabel = m.confMult >= 1 ? "HIGH" : m.confMult >= 0.7 ? "MED" : "LOW";
+        const s = m.setupSignals || {};
+        const ss = (v, label, pts) => `    ${v ? "✓" : "·"}  ${label}${v ? `  (+${pts})` : ""}`;
+        const modelPts = Math.round(Math.max(0, Math.min(1, m.baseRoi)) * 35);
+        return [
+            `TOP PICKS SCORE  ${score} / 100`,
+            ``,
+            `Additive composite — every signal earns bounded points.`,
+            ``,
+            `Model projection   ${pctSigned(m.modelProj)}   →  ${modelPts} / 35 pts`,
+            `  modelScore ${pct(m.modelScore)} · conf ×${m.confMult.toFixed(2)} (${confLabel}, width ${pct(m.modelConfWidth)}) · downside ×${m.confLowBonus.toFixed(2)}`,
+            `  baseRoi ${pct(m.baseRoi)}`,
+            ``,
+            `Cultural moat      ${pct(m.cultural)}   →  ${pts(m.cultural, 15)} pts`,
+            `Demand momentum    7d=${pctSigned(m.nf7Pct)} / 30d=${pctSigned(m.nf30Pct)}   →  ${pts(m.demand, 15)} pts`,
+            `Real scarcity      pop=${popStr} · sat=${satStr}${alignNote}   →  ${pts(m.scarcity, 15)} pts`,
+            `PSA 10 trajectory  ${trajLabel}   →  ${pts(m.momentum, 10)} pts`,
+            `Grading value      EV ${evStr}  ROI ${roiStr}   →  ${pts(m.gradingValue, 10)} pts`,
+            ``,
+            `Setup pattern (classic reversal/accumulation):   +${(m.setupBonus || 0).toFixed(1)} / 10 pts`,
+            ss(s.isRisingDemand, `Rising demand (30d > 0 AND 7d > 30d)`, "2.5"),
+            ss(s.isTightSupply,  `Tight supply (sat ≤ 0.75)`, "2.5"),
+            ss(s.isReversal,     `Chart reversal (rebound / thin-rising)`, "2.5"),
+            ss(s.isOffPeak,      `Off 12mo peak (≥15% below high)`, "2.5"),
+        ].join("\n");
+    }
     return [
-        `SMART INVESTOR SCORE  ${score} / 100`,
+        `TOP PICKS SCORE  ${score} / 100  (capped at 50, no projection)`,
         ``,
-        `Cultural impact    ${pct(m.cultural).padStart(4)}   →  ${pts(m.cultural, 15)} pts`,
+        `Model has no projection for this card — falling back to pre-model`,
+        `heuristic composite. Score capped at 50 so model-backed cards always`,
+        `rank above no-projection cards.`,
         ``,
-        `Demand momentum    7d=${pctSigned(m.nf7Pct)} / 30d=${pctSigned(m.nf30Pct)}`,
-        `                            →  ${pts(m.demand, 25)} pts`,
-        ``,
-        `Real Scarcity (3 INDEPENDENT signals):`,
-        `  PSA 10 pop       ${popStr.padStart(4)}      →  ${pct(m.popScarce)}`,
-        `  Supply tightness sat=${satStr}   →  ${pct(m.supplyTight)}`,
-        `  Price stability  12mo spread → ${pct(m.priceStable)}`,
-        `                            →  ${pts(m.scarcity, 25)} pts${alignNote}`,
-        ``,
-        `PSA 10 trajectory  ${trajLabel.padStart(14)}`,
-        `                            →  ${pts(m.momentum, 15)} pts`,
-        ``,
-        `Grading value      EV ${evStr}  ROI ${roiStr}  gem ${pct(m.gemPct)}`,
-        `                            →  ${pts(m.gradingValue, 20)} pts`,
-        ``,
-        `100 = perfect alignment across all 5 dimensions.`,
+        `Cultural impact    ${pct(m.cultural).padStart(4)}`,
+        `Demand momentum    7d=${pctSigned(m.nf7Pct)} / 30d=${pctSigned(m.nf30Pct)}  → ${pct(m.demand)}`,
+        `Scarcity           pop=${popStr} · sat=${satStr}${alignNote}  → ${pct(m.scarcity)}`,
+        `PSA 10 trajectory  ${trajLabel}  → ${pct(m.momentum)}`,
+        `Grading value      EV ${evStr}  ROI ${roiStr}`,
     ].join("\n");
 }
 
@@ -1348,10 +1686,12 @@ function projChipHtml(cardId) {
             const lo = (confLow * 100).toFixed(0);
             const hi = (confHigh * 100).toFixed(0);
             const w = confWidth || (confHigh - confLow);
-            const confCls = w < 0.15 ? "mb-chip tier-strong"
-                          : w < 0.30 ? "mb-chip tier-solid"
+            // v2_0 bootstrap-ensemble p25/p75 widths — LOW reserved for the
+            // top ~8% most-uncertain cards so the label actually means "needs caution."
+            const confCls = w < 0.05 ? "mb-chip tier-strong"
+                          : w < 0.08 ? "mb-chip tier-solid"
                           : "mb-chip tier-weak";
-            const confLabel = w < 0.15 ? "HIGH" : w < 0.30 ? "MED" : "LOW";
+            const confLabel = w < 0.05 ? "HIGH" : w < 0.08 ? "MED" : "LOW";
             confHtml = `<span class="${esc(confCls)}" data-tip="${esc(lo)}% to ${esc(hi)}%">${esc(confLabel)}</span>`;
         }
     }
@@ -1502,7 +1842,7 @@ function updateLoadMore(list) {
         c["net-flow-pct"] !== null && c["net-flow-pct"] !== undefined
     ).length;
 
-    const needsMarketData = (view === "mustbuy" || view === "demandsurge" || view === "topchase");
+    const needsMarketData = (view === "buythedip" || view === "mustbuy" || view === "demandsurge" || view === "topchase");
     const poolNote = needsMarketData
         ? ` (of ${marketPoolSize} with market data)`
         : "";
@@ -1520,7 +1860,7 @@ function renderRows(list, start, count) {
             view === "demandsurge" ? HEADERS.demandsurge :
             view === "bestgrading" ? HEADERS.bestgrading :
                                       HEADERS.mustbuy;
-        const needsMarketData = (view === "mustbuy" || view === "demandsurge" || view === "topchase");
+        const needsMarketData = (view === "buythedip" || view === "mustbuy" || view === "demandsurge" || view === "topchase");
         const hint = needsMarketData
             ? " This view requires eBay market-pressure data, which currently covers ~17% of the catalog — try loosening a threshold or check the Long-Term Holds / Best Grading tabs which don't need market data."
             : " Try loosening the price floor or relaxing a filter.";
@@ -1530,12 +1870,13 @@ function renderRows(list, start, count) {
         document.getElementById("status-count").textContent = `0 cards`;
         return;
     }
-    if (view === "holds")              renderRowsHolds(list, start, count);
+    if (view === "buythedip")          renderRowsBuyTheDip(list, start, count);
+    else if (view === "holds")         renderRowsHolds(list, start, count);
     else if (view === "mustbuy")       renderRowsMustBuy(list, start, count);
     else if (view === "topchase")      renderRowsTopChase(list, start, count);
     else if (view === "demandsurge")   renderRowsDemandSurge(list, start, count);
     else if (view === "bestgrading")   renderRowsBestGrading(list, start, count);
-    else                                renderRowsMustBuy(list, start, count);
+    else                                renderRowsBuyTheDip(list, start, count);
 }
 
 // --- scatter map chart ---
@@ -1826,14 +2167,16 @@ function fullRender() {
         computeMustBuyScore(c);             // 6-dimension smart-investor composite
         computeBestGradingScore(c);         // simple % uplift for Best Grading Play
         computeTopChaseScoreEnriched(c);    // log(psa10) × demand × cultural for Top Chase
+        computeDipScore(c);                 // ATH dip + reversal signals for Buy the Dip
     }
     let list;
-    if (view === "holds")              list = filterHolds();
+    if (view === "buythedip")          list = filterBuyTheDip();
+    else if (view === "holds")         list = filterHolds();
     else if (view === "mustbuy")       list = filterMustBuy();
     else if (view === "topchase")      list = filterTopChase();
     else if (view === "demandsurge")   list = filterDemandSurge();
     else if (view === "bestgrading")   list = filterBestGrading();
-    else                                list = filterMustBuy();  // safe default
+    else                                list = filterBuyTheDip();  // safe default
 
     // Apply era filter on top of view filter
     if (currentEra !== "all") {
@@ -1884,11 +2227,13 @@ function wireToolbar() {
             view = btn.dataset.view;
 
             // Swap control groups
+            const dipCtrl   = document.querySelector(".opp-controls-buythedip");
             const holdsCtrl = document.querySelector(".opp-controls-holds");
             const mbCtrl    = document.querySelector(".opp-controls-mustbuy");
             const tcCtrl    = document.querySelector(".opp-controls-topchase");
             const dsCtrl    = document.querySelector(".opp-controls-demandsurge");
             const bgCtrl    = document.querySelector(".opp-controls-bestgrading");
+            if (dipCtrl)   dipCtrl.style.display   = (view === "buythedip")  ? "flex" : "none";
             if (holdsCtrl) holdsCtrl.style.display = (view === "holds")       ? "flex" : "none";
             if (mbCtrl)    mbCtrl.style.display    = (view === "mustbuy")     ? "flex" : "none";
             if (tcCtrl)    tcCtrl.style.display    = (view === "topchase")    ? "flex" : "none";
@@ -1896,14 +2241,15 @@ function wireToolbar() {
             if (bgCtrl)    bgCtrl.style.display    = (view === "bestgrading") ? "flex" : "none";
 
             // Reset sort to view's sensible default
-            if (view === "holds")             currentSort = { key: "score",      dir: "desc" };
+            if (view === "buythedip")         currentSort = { key: "dipscore",   dir: "desc" };
+            else if (view === "holds")        currentSort = { key: "score",      dir: "desc" };
             else if (view === "mustbuy")      currentSort = Object.keys(modelProjections).length > 0
                                                              ? { key: "proj", dir: "desc" }
                                                              : { key: "mbscore", dir: "desc" };
             else if (view === "topchase")     currentSort = { key: "chasescore", dir: "desc" };
             else if (view === "demandsurge")  currentSort = { key: "ratio",      dir: "desc" };
-            else if (view === "bestgrading")  currentSort = { key: "ev",         dir: "desc" };
-            else                               currentSort = { key: "mbscore",   dir: "desc" };
+            else if (view === "bestgrading")  currentSort = { key: "roi",        dir: "desc" };
+            else                               currentSort = { key: "dipscore",  dir: "desc" };
 
             fullRender();
         });
@@ -1920,12 +2266,51 @@ function wireToolbar() {
         });
     }
 
+    // -- Buy the Dip controls --
+    const dipPsa10Input = document.getElementById("dip-min-psa10");
+    if (dipPsa10Input) {
+        dipPsa10Input.addEventListener("input", (e) => {
+            const v = Number(e.target.value);
+            if (Number.isFinite(v) && v >= 0) { dipMinPsa10 = v; if (view === "buythedip") fullRender(); }
+        });
+    }
+    const dipDipPctSlider = document.getElementById("dip-min-dippct");
+    const dipDipPctVal = document.getElementById("dip-min-dippct-val");
+    if (dipDipPctSlider) {
+        dipDipPctSlider.addEventListener("input", () => {
+            dipMinDipPct = Number(dipDipPctSlider.value);
+            if (dipDipPctVal) dipDipPctVal.textContent = (dipMinDipPct * 100).toFixed(0) + "%";
+            if (view === "buythedip") fullRender();
+        });
+    }
+    const dipScoreSlider = document.getElementById("dip-min-score");
+    const dipScoreVal = document.getElementById("dip-min-score-val");
+    if (dipScoreSlider) {
+        dipScoreSlider.addEventListener("input", () => {
+            dipMinScore = Number(dipScoreSlider.value);
+            if (dipScoreVal) dipScoreVal.textContent = String(dipMinScore);
+            if (view === "buythedip") fullRender();
+        });
+    }
+
     // -- Top Chase controls --
     const tcMinPsa10Input = document.getElementById("topchase-min-psa10");
     if (tcMinPsa10Input) {
         tcMinPsa10Input.addEventListener("input", (e) => {
             const v = Number(e.target.value);
             if (Number.isFinite(v) && v >= 0) { chaseMinPsa10 = v; if (view === "topchase") fullRender(); }
+        });
+    }
+    const tcMaxPsa10Input = document.getElementById("topchase-max-psa10");
+    if (tcMaxPsa10Input) {
+        tcMaxPsa10Input.addEventListener("input", (e) => {
+            const raw = e.target.value.trim();
+            if (raw === "") { chaseMaxPsa10 = null; }
+            else {
+                const v = Number(raw);
+                if (Number.isFinite(v) && v >= 0) chaseMaxPsa10 = v;
+            }
+            if (view === "topchase") fullRender();
         });
     }
 
@@ -2025,16 +2410,29 @@ async function loadCardIndex() {
         allCards = cards;
 
         // Load projections (graceful — works without model)
+        let dataAsOf = null, lastRunAt = null;
         if (projRes && projRes.ok) {
             const projData = await projRes.json();
             modelProjections = projData.projections || {};
+            dataAsOf = projData.data_as_of || null;
+            lastRunAt = projData.last_pipeline_run_at || null;
             console.log(`Loaded ${Object.keys(modelProjections).length} model projections`);
         } else {
             modelProjections = {};
             console.log("No model projections available (model not trained yet)");
         }
 
+        // Upgrade Must Buy's default sort from mbscore → proj once
+        // projections are known to be available. Gives users the
+        // investor-optimal ranking (the one earning +102% cumulative in
+        // the blind historical backtest) on first page load.
+        if (view === "mustbuy" && Object.keys(modelProjections).length > 0
+            && currentSort.key === "mbscore") {
+            currentSort = { key: "proj", dir: "desc" };
+        }
+
         fullRender();
+        renderFreshnessBanner(dataAsOf, lastRunAt);
 
         const singles = allCards.filter(c => !c["is-sealed"]);
         const sealed = allCards.filter(c => c["is-sealed"]);
@@ -2050,6 +2448,61 @@ async function loadCardIndex() {
         document.getElementById("card-tbody").innerHTML =
             `<tr><td colspan="${colCount}" style="text-align:center;color:#cc0000;">Failed to load. Check connection.</td></tr>`;
     }
+}
+
+/* Render a freshness banner above the leaderboard table.
+   >36h since last pipeline run => warning style + mute projection columns. */
+function renderFreshnessBanner(dataAsOf, lastRunAt) {
+    const pickMostRecent = (a, b) => {
+        const ta = a ? Date.parse(/Z$|[+-]\d\d:?\d\d$/.test(a) ? a : a + "Z") : NaN;
+        const tb = b ? Date.parse(/Z$|[+-]\d\d:?\d\d$/.test(b) ? b : b + "Z") : NaN;
+        if (!Number.isFinite(ta) && !Number.isFinite(tb)) return null;
+        if (!Number.isFinite(ta)) return b;
+        if (!Number.isFinite(tb)) return a;
+        return ta > tb ? a : b;
+    };
+    const src = pickMostRecent(dataAsOf, lastRunAt);
+    const parsed = src ? Date.parse(/Z$|[+-]\d\d:?\d\d$/.test(src) ? src : src + "Z") : NaN;
+    const hoursAgo = Number.isFinite(parsed) ? (Date.now() - parsed) / 3600000 : Infinity;
+    const stale = hoursAgo > 36;
+    const label = !Number.isFinite(hoursAgo) ? "Updated: unknown"
+        : hoursAgo < 1  ? "Updated <1h ago"
+        : hoursAgo < 48 ? `Updated ${Math.round(hoursAgo)}h ago`
+        : `Updated ${Math.round(hoursAgo / 24)}d ago`;
+
+    let banner = document.getElementById("data-freshness-banner");
+    if (!banner) {
+        banner = document.createElement("div");
+        banner.id = "data-freshness-banner";
+        banner.style.cssText =
+            "font-size:11px;padding:6px 10px;margin:6px 0;border:1px solid;" +
+            "display:flex;align-items:center;gap:8px;font-family:inherit;";
+        const host = document.getElementById("status-msg");
+        if (host && host.parentNode) host.parentNode.insertBefore(banner, host.nextSibling);
+        else document.body.insertBefore(banner, document.body.firstChild);
+    }
+    while (banner.firstChild) banner.removeChild(banner.firstChild);
+    const icon = document.createElement("span");
+    icon.textContent = stale ? "\u26A0" : "\u25CF";
+    icon.style.fontWeight = "bold";
+    const text = document.createElement("span");
+    text.textContent = stale
+        ? `STALE DATA — ${label}. Pipeline may have failed; projections may be out of date.`
+        : label;
+    banner.appendChild(icon);
+    banner.appendChild(text);
+    if (stale) {
+        banner.style.background = "#fff4d6";
+        banner.style.borderColor = "#c08000";
+        banner.style.color = "#6e4800";
+    } else {
+        banner.style.background = "#eef6ee";
+        banner.style.borderColor = "#6a9a6a";
+        banner.style.color = "#385a38";
+    }
+    // Mute projection-related columns/cells when stale.
+    document.querySelectorAll("#card-tbody .proj-cell, #card-tbody .projection")
+        .forEach(el => { el.style.opacity = stale ? "0.6" : ""; });
 }
 
 wireToolbar();

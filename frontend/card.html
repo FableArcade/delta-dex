@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>PokeDelta - POKEMETRICS.EXE - Card Detail</title>
+    <title>Delta Dex - DELTADEX.EXE - Card Detail</title>
     <link rel="stylesheet" href="css/win98.css">
     <link rel="stylesheet" href="css/retro-screen.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -27,12 +27,70 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            position: relative;
         }
         .card-image-frame img {
             max-width: 100%;
             height: auto;
             display: block;
             image-rendering: auto;
+        }
+
+        /* Rarity corner badge on the card image */
+        .rarity-corner {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.82);
+            color: #fff;
+            font-family: "MS Sans Serif", sans-serif;
+            font-size: 10px;
+            line-height: 1.25;
+            padding: 6px 8px;
+            border: 1px solid rgba(255,255,255,0.35);
+            border-radius: 3px;
+            box-shadow: 2px 2px 0 rgba(0,0,0,0.35);
+            min-width: 96px;
+            z-index: 3;
+            pointer-events: auto;
+        }
+        .rarity-corner-grade {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 22px;
+            font-weight: bold;
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+        .rarity-corner-grade .grade-label {
+            font-size: 9px;
+            color: #ccc;
+            font-weight: normal;
+            letter-spacing: 0.08em;
+        }
+        .rarity-corner-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 6px;
+            font-size: 10px;
+        }
+        .rarity-corner-row .k { color: #bbb; }
+        .rarity-corner-row .v { color: #fff; font-weight: bold; }
+        .grade-S-plus { color: #b8860b; font-weight: bold; text-shadow: 0 0 2px rgba(255,215,0,0.4); }
+        .grade-S { color: #c89200; font-weight: bold; }
+        .grade-A { color: #2e7d32; font-weight: bold; }
+        .grade-B { color: #1565c0; font-weight: bold; }
+        .grade-C { color: #616161; font-weight: bold; }
+        .grade-D { color: #9e9e9e; font-weight: bold; }
+        .stat-box-grade #stat-rarity-grade { letter-spacing: 0.04em; }
+        .rarity-corner-foot {
+            margin-top: 4px;
+            padding-top: 4px;
+            border-top: 1px solid rgba(255,255,255,0.2);
+            font-size: 9px;
+            color: #bbb;
+            text-align: center;
         }
 
         .card-info-name {
@@ -229,6 +287,61 @@
             margin-top: 2px;
         }
 
+        /* Set-alpha popover */
+        .stat-box-alpha { transition: background 0.12s; }
+        .stat-box-alpha:hover { background: rgba(192, 64, 64, 0.12); }
+        .alpha-popover {
+            position: absolute;
+            top: calc(100% + 4px);
+            right: 0;
+            z-index: 9999;
+            min-width: 280px;
+            max-width: 360px;
+            background: var(--win-surface, #c3c3c3);
+            border: 2px outset var(--win-surface, #c3c3c3);
+            box-shadow: 4px 4px 0 rgba(0,0,0,0.35);
+            padding: 6px;
+            font-size: 11px;
+            color: var(--win-text, #000);
+        }
+        .alpha-popover-title {
+            font-weight: bold;
+            padding: 2px 4px 6px;
+            border-bottom: 1px solid rgba(0,0,0,0.35);
+            margin-bottom: 4px;
+        }
+        .alpha-popover-row {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            gap: 8px;
+            padding: 4px 6px;
+            cursor: pointer;
+            align-items: center;
+            border-radius: 2px;
+        }
+        .alpha-popover-row:hover { background: #000080; color: #fff; }
+        .alpha-popover-row:hover .alpha-corr,
+        .alpha-popover-row:hover .alpha-ret { color: #fff; }
+        .alpha-popover-row.is-alpha {
+            background: rgba(255, 204, 0, 0.18);
+            font-weight: bold;
+        }
+        .alpha-popover-row.is-self {
+            background: rgba(0, 128, 0, 0.12);
+            font-style: italic;
+        }
+        .alpha-corr { font-family: monospace; font-size: 10px; color: #555; }
+        .alpha-ret { font-family: monospace; font-size: 10px; min-width: 48px; text-align: right; }
+        .alpha-ret.up { color: #007700; }
+        .alpha-ret.down { color: #bb0000; }
+        .alpha-popover-footer {
+            margin-top: 4px;
+            padding: 4px 6px;
+            border-top: 1px solid rgba(0,0,0,0.2);
+            font-size: 10px;
+            color: #555;
+        }
+
         /* Key metrics grid */
         .metrics-grid {
             display: grid;
@@ -384,7 +497,7 @@
 
         <!-- Title bar -->
         <div class="window-title">
-            <span class="window-title-text" id="window-title">POKEMETRICS.EXE - Card Detail</span>
+            <span class="window-title-text" id="window-title">DELTADEX.EXE - Card Detail</span>
             <div class="window-controls">
                 <button class="window-btn">_</button>
                 <button class="window-btn">&square;</button>
@@ -448,7 +561,7 @@
                             <div class="stat-box-value small" id="stat-gain-pct">---</div>
                         </div>
                         <div class="stat-box">
-                            <div class="stat-box-label" data-tooltip="How often this card trades on PriceCharting's data. Higher = more liquid — easier to buy or exit a position quickly.">Sales Volume</div>
+                            <div class="stat-box-label" data-tooltip="eBay sold listings in the last 7 days. Higher = more liquid — easier to buy or exit a position quickly.">Sales Volume (7d)</div>
                             <div class="stat-box-value small" id="stat-volume">---</div>
                         </div>
                     </div>
@@ -469,13 +582,53 @@
                             <div class="stat-box-label" data-tooltip="12-month price range relative to current price. Higher volatility = more mean-reversion opportunity in the wishlist scorer.">Volatility</div>
                             <div class="stat-box-value small" id="stat-volatility">---</div>
                         </div>
+                        <div class="stat-box stat-box-alpha" id="stat-alpha-wrap" style="position:relative;cursor:pointer;">
+                            <div class="stat-box-label" data-tooltip="Set-alpha linkage: the top chase card in this set and how tightly this card tracks it. Hover to see all related cards ranked by correlation — click any row to jump to that card.">Set Alpha<span id="stat-alpha-self-tag" style="display:none;color:#ffcc00;font-weight:bold;"> ★</span></div>
+                            <div class="stat-box-value small" id="stat-alpha-label">---</div>
+                            <div id="alpha-popover" class="alpha-popover" style="display:none;">
+                                <div class="alpha-popover-title" id="alpha-popover-title">Loading…</div>
+                                <div class="alpha-popover-body" id="alpha-popover-body"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-grid" id="rarity-grid" style="margin-top:4px;display:none;">
+                        <div class="stat-box stat-box-grade">
+                            <div class="stat-box-label" data-tooltip="Overall rarity grade — combines how rare the card is to pull from a pack (specific pull rate) with how hard it is to grade PSA 10 (gem rate). Higher grade = scarcer overall. S+ ≤ 1 in 10k · S ≤ 1/5k · A ≤ 1/2.5k · B ≤ 1/1k · C ≤ 1/500 · D more common.">Rarity Grade</div>
+                            <div class="stat-box-value" id="stat-rarity-grade" style="font-size:22px;line-height:1;">—</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-box-label" data-tooltip="Odds of pulling THIS specific card from a booster pack. Based on the set's rarity tier odds divided across every card at this rarity. 1/1,440 means on average one in every 1,440 booster packs yields this card.">Pull Rate</div>
+                            <div class="stat-box-value small" id="stat-pull-rate">—</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-box-label" data-tooltip="Of cards submitted to PSA, the % that come back as PSA 10 (gem mint). Lower gem rate = structurally scarcer in top grade. 25% and below is rare — hard-to-center or edge-prone prints.">Gem Rate</div>
+                            <div class="stat-box-value small" id="stat-gem-rate">—</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-box-label" data-tooltip="Pull rate × gem rate — odds that any given booster pack yields a PSA 10 copy of this card. This is the composite scarcity the grade is calculated from.">PSA 10 Odds</div>
+                            <div class="stat-box-value small" id="stat-psa10-odds">—</div>
+                        </div>
+                    </div>
+                    <div id="promo-rarity-disclaimer" style="display:none;margin-top:6px;padding:6px 10px;background:#fff4d6;border:1px solid #d0a030;font-size:11px;color:#604500;line-height:1.4;">
+                        <strong>Note:</strong> Rarity grade doesn't cleanly apply to promo cards — they're not pulled from packs. Promo distribution (event exclusives, product inserts, regional giveaways) varies widely, so pull/gem rates are unreliable. Use <strong>Cultural Relevance</strong> (below) as the primary scarcity/demand signal here.
+                    </div>
+                    <div class="stat-grid" id="cultural-grid" style="margin-top:4px;display:none;">
+                        <div class="stat-box">
+                            <div class="stat-box-label" data-tooltip="Cultural relevance — how iconic the card's subject (Pokemon name, trainer, artwork) is, combined with rarity-tier bonuses. Drives the demand floor: a Charizard at any rarity keeps collector pressure that a no-name card can't. 0-100%. Used by Must Buy, Pure ROI, and the prediction model.">Cultural Relevance</div>
+                            <div class="stat-box-value" id="stat-cultural-relevance" style="font-size:22px;line-height:1;">—</div>
+                            <div class="stat-box-sub" id="stat-cultural-tier" style="font-size:11px;color:#606060;margin-top:2px;">—</div>
+                        </div>
+                        <!-- spacer boxes maintain column width parity with the rarity grid above -->
+                        <div class="stat-box" style="visibility:hidden;"></div>
+                        <div class="stat-box" style="visibility:hidden;"></div>
+                        <div class="stat-box" style="visibility:hidden;"></div>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- ============================================================ -->
-        <!-- MODEL PROJECTION (PokeDelta) -->
+        <!-- MODEL PROJECTION (Delta Dex) -->
         <!-- ============================================================ -->
         <div class="window-body" id="model-projection" style="display:none;">
             <div class="window">
@@ -502,6 +655,71 @@
                         <div id="proj-waterfall"></div>
                     </div>
                     <div id="proj-version" style="font-size:10px;color:#808080;margin-top:8px;"></div>
+                    <!-- Abstention message shown only when LOW confidence -->
+                    <div id="proj-abstain" style="display:none;border-top:1px solid #c0c0c0;margin-top:8px;padding-top:8px;font-size:11px;color:#606060;line-height:1.5;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- WHERE THIS MODEL FAILS (calibrated trust) -->
+        <!-- ============================================================ -->
+        <div class="window-body" id="model-caveats" style="display:none;">
+            <div class="window">
+                <div class="window-title" style="background: linear-gradient(90deg, #804040, #a06060);">
+                    <span class="window-title-text">C:\WHERE_THIS_MODEL_FAILS.TXT</span>
+                </div>
+                <div class="window-body" style="padding: 12px; font-size: 12px; color: #404040;">
+                    <div style="font-size:10px;font-weight:bold;text-transform:uppercase;color:#606060;margin-bottom:8px;">Large-world forces this small-world model doesn't see</div>
+                    <ul id="caveats-list" style="margin: 0; padding-left: 20px; line-height: 1.7;">
+                        <li><strong>Sentiment &amp; attention:</strong> no Reddit r/pkmntcg volume, Google Trends, or Twitter mention velocity. Demand-surge buckets are structurally under-specified here.</li>
+                        <li><strong>Cultural catalysts:</strong> no anime episode airings, no set-release hype curves, no tournament top-8 decklists, no influencer/artist collab announcements.</li>
+                        <li><strong>Reprint risk:</strong> modeled heuristically from era + rarity, not from set-release calendar or TPCi reprint signals.</li>
+                        <li><strong>Grading supply shocks:</strong> PSA population changes are lagged; sudden pop-report drops aren't caught in real-time.</li>
+                        <li><strong>Macro/whale moves:</strong> crypto-correlated liquidity, whale wallet flows, and macro risk-on/off regime are not inputs.</li>
+                    </ul>
+                    <div id="caveats-per-card" style="margin-top:10px;padding-top:8px;border-top:1px solid #e0e0e0;"></div>
+                    <div style="margin-top:10px;padding-top:8px;border-top:1px solid #e0e0e0;font-size:11px;color:#808080;font-style:italic;">
+                        This section exists because <em>calibrated trust &gt; maximum trust</em>. The UI should teach you where the model is weak, not only where it's strong. Source: <a href="https://pair.withgoogle.com/chapter/explainability-trust/" target="_blank" rel="noopener" style="color:#606060;">Google PAIR Guidebook</a>.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- TOURNAMENT PLAY (v2.2 competitive-demand signal) -->
+        <!-- ============================================================ -->
+        <div class="window-body" id="tournament-play" style="display:none;">
+            <div class="window">
+                <div class="window-title" style="background: linear-gradient(90deg, #004080, #4080c0);">
+                    <span class="window-title-text">C:\TOURNAMENT_PLAY.DAT - Competitive Demand</span>
+                </div>
+                <div class="window-body" style="padding: 12px;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;">
+                        <div>
+                            <div style="font-size:10px;font-weight:bold;text-transform:uppercase;color:#606060;">Apps (90d)</div>
+                            <div id="tp-apps-90d" style="font-size:28px;font-weight:bold;font-variant-numeric:tabular-nums;">&mdash;</div>
+                            <div style="font-size:11px;color:#808080;">across tournaments</div>
+                        </div>
+                        <div>
+                            <div style="font-size:10px;font-weight:bold;text-transform:uppercase;color:#606060;">Top-8 Apps</div>
+                            <div id="tp-top8-90d" style="font-size:28px;font-weight:bold;font-variant-numeric:tabular-nums;color:#006400;">&mdash;</div>
+                            <div style="font-size:11px;color:#808080;">deep-cut appearances</div>
+                        </div>
+                        <div>
+                            <div style="font-size:10px;font-weight:bold;text-transform:uppercase;color:#606060;">Distinct Events</div>
+                            <div id="tp-tournaments-90d" style="font-size:28px;font-weight:bold;font-variant-numeric:tabular-nums;">&mdash;</div>
+                            <div style="font-size:11px;color:#808080;">tournaments played</div>
+                        </div>
+                        <div>
+                            <div style="font-size:10px;font-weight:bold;text-transform:uppercase;color:#606060;">Last Seen</div>
+                            <div id="tp-last-seen" style="font-size:16px;font-weight:bold;font-variant-numeric:tabular-nums;margin-top:6px;">&mdash;</div>
+                            <div style="font-size:11px;color:#808080;">limitlesstcg.com</div>
+                        </div>
+                    </div>
+                    <div style="margin-top:10px;padding-top:8px;border-top:1px solid #e0e0e0;font-size:11px;color:#606060;line-height:1.5;">
+                        Player demand — this card is being used in competitive decks. Multi-source signal: <strong>high appearance count</strong> means meta relevance; <strong>top-8 appearances</strong> mean the card is in winning lists, not just fringe decks. This is raw data — the v2.0 model doesn't use it yet, but v2.2 (in walkforward) will.
+                    </div>
                 </div>
             </div>
         </div>
@@ -672,6 +890,46 @@
             </div>
         </div>
 
+        <!-- F: Set-Alpha Linkage (only rendered when data present) -->
+        <div class="window-body" id="alpha-linkage-wrap" style="display:none;">
+            <div class="window">
+                <div class="window-title" style="background: linear-gradient(90deg, #800000, #c04040);">
+                    <span class="window-title-text">C:\SET_ALPHA_LINKAGE.DAT</span>
+                </div>
+                <div class="section-explainer" id="alpha-linkage-explainer">
+                    how this card tracks the top chase card in its set
+                </div>
+                <div class="window-body">
+                    <div class="stat-grid" id="alpha-linkage-stats">
+                        <div class="stat-box" style="margin-top:0;">
+                            <div class="stat-box-label" data-tooltip="The highest-priced chase card in this set. Across 17 modern sets the alpha's monthly returns explain a meaningful chunk of the betas' moves — especially within Eeveelution clusters (ρ ~0.75).">Set Alpha</div>
+                            <div class="stat-box-value small" id="alpha-name-cell"><a id="alpha-link" href="#">---</a></div>
+                        </div>
+                        <div class="stat-box" style="margin-top:0;">
+                            <div class="stat-box-label" data-tooltip="Pearson correlation of this card's monthly PSA 10 returns vs the set alpha's. ≥0.70 = tight co-movement; 0.50-0.70 = meaningful beta; <0.50 = weak/independent.">Contemp ρ</div>
+                            <div class="stat-box-value small" id="alpha-contemp-cell">---</div>
+                        </div>
+                        <div class="stat-box" style="margin-top:0;">
+                            <div class="stat-box-label" data-tooltip="Correlation of alpha[t] vs this card[t+1]. Positive = alpha's move this month forecasts a move the same direction in this card next month. Across 17 sets the average lead ρ is +0.266.">Lead ρ (1mo)</div>
+                            <div class="stat-box-value small" id="alpha-lead-cell">---</div>
+                        </div>
+                        <div class="stat-box" style="margin-top:0;">
+                            <div class="stat-box-label" data-tooltip="Set alpha's PSA 10 price change over the last 30 days. Bearish alpha → expect drag on this beta card next month.">Alpha 30d</div>
+                            <div class="stat-box-value small" id="alpha-30d-cell">---</div>
+                        </div>
+                        <div class="stat-box" style="margin-top:0;">
+                            <div class="stat-box-label" data-tooltip="Set alpha's PSA 10 price change over the last 90 days. Use together with 30d to gauge trend direction.">Alpha 90d</div>
+                            <div class="stat-box-value small" id="alpha-90d-cell">---</div>
+                        </div>
+                    </div>
+                    <div id="alpha-linkage-verdict" class="groupbox" style="margin-top:8px;">
+                        <div class="groupbox-label">Verdict</div>
+                        <div id="alpha-linkage-verdict-body" style="font-size:12px;">---</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Status bar -->
         <div class="statusbar">
             <div class="statusbar-field" id="status-msg">Loading card data...</div>
@@ -694,7 +952,7 @@
         <span style="font-size:14px;">&#9733;</span> Start
     </button>
     <div class="taskbar-divider"></div>
-    <button class="taskbar-task active">POKEMETRICS.EXE</button>
+    <button class="taskbar-task active">DELTADEX.EXE</button>
     <div class="taskbar-clock" id="clock"></div>
 </div>
 
@@ -712,5 +970,6 @@ updateClock();
 setInterval(updateClock, 60000);
 </script>
 
+<script src="/js/regime_chip.js" defer></script>
 </body>
 </html>
