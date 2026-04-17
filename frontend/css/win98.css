@@ -112,10 +112,10 @@ body {
 /* The window-content wrapper scrolls; the window frame does not.
    Title bar, menubar, and statusbar stay pinned outside this. */
 .window-content {
-    flex: 1;
+    flex: 1 1 0;
     overflow-y: auto;
     overflow-x: hidden;
-    background: var(--win-white);
+    min-height: 0;
 }
 
 /* Fallback: if no .window-content wrapper, the first .window-body scrolls */
