@@ -305,6 +305,23 @@ body {
     gap: 4px;
 }
 
+.back-btn {
+    height: 24px;
+    padding: 0 8px;
+    background: var(--win-surface);
+    box-shadow: var(--bevel-raised);
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    display: none;
+}
+.back-btn:active { box-shadow: var(--bevel-sunken); }
+
+@media (max-width: 768px) {
+    .back-btn { display: block; }
+}
+
 .start-btn {
     height: 24px;
     padding: 0 8px;

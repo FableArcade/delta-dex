@@ -366,11 +366,29 @@
             table.win-table thead th:nth-child(4),
             table.win-table tbody td:nth-child(4) { display: none; }
 
+            /* Constrain card name so other columns fit */
+            table.win-table tbody td:nth-child(3) {
+                max-width: 100px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
             /* Smaller card images on mobile */
             table.win-table tbody td img {
                 width: 36px !important;
                 height: 50px !important;
             }
+
+            /* Hide less important columns on mobile per tab:
+               ATH DATE (7th), SAT IDX (9th), NF 7D (10th), NF 30D (11th) */
+            table.win-table thead th:nth-child(7),
+            table.win-table tbody td:nth-child(7) { display: none; }
+            table.win-table thead th:nth-child(9),
+            table.win-table tbody td:nth-child(9) { display: none; }
+            table.win-table thead th:nth-child(10),
+            table.win-table tbody td:nth-child(10) { display: none; }
+            table.win-table thead th:nth-child(11),
+            table.win-table tbody td:nth-child(11) { display: none; }
 
             /* Table horizontal scroll */
             .win-table-wrap {
