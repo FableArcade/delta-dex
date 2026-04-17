@@ -288,21 +288,19 @@ body {
 }
 
 .back-btn {
-    height: 24px;
-    padding: 0 10px;
-    background: var(--win-surface);
-    box-shadow: var(--bevel-raised);
-    border: none;
+    padding: 2px 8px;
     cursor: pointer;
+    font-size: 12px;
     font-family: inherit;
-    font-weight: bold;
-    font-size: 11px;
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 4px;
+    background: none;
+    border: none;
+    text-decoration: none;
+    color: var(--win-text);
 }
-.back-btn:active { box-shadow: var(--bevel-sunken); }
+.back-btn:hover {
+    background: var(--win-highlight);
+    color: var(--win-highlight-text);
+}
 
 .start-btn {
     height: 24px;
