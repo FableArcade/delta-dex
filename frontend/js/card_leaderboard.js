@@ -1391,7 +1391,7 @@ function renderRowsBuyTheDip(list, start, count) {
         // matches existing codebase (renderRowsMustBuy, renderRowsHolds, etc).
         tr.innerHTML = `
             <td class="text-center"><span class="${esc(rankClass(i + 1))}">${i + 1}</span></td>
-            <td>${imgUrl ? `<img src="${esc(imgUrl)}" alt="" style="width:42px;height:58px;object-fit:contain;" loading="lazy">` : "\u2014"}</td>
+            <td>${imgUrl ? `<img src="${esc(imgUrl)}" alt="" style="width:50px;height:70px;object-fit:contain;" loading="lazy">` : "\u2014"}</td>
             <td>${name}</td>
             <td>${setCode}</td>
             <td class="text-right text-mono">${money(psa10)}</td>
@@ -1451,7 +1451,7 @@ function renderRowsBestGrading(list, start, count) {
 
         tr.innerHTML = `
             <td class="text-center"><span class="${rankClass(i + 1)}">${i + 1}</span></td>
-            <td>${imgUrl ? `<img src="${imgUrl}" alt="" style="width:42px;height:58px;object-fit:contain;" loading="lazy">` : "\u2014"}</td>
+            <td>${imgUrl ? `<img src="${imgUrl}" alt="" style="width:50px;height:70px;object-fit:contain;" loading="lazy">` : "\u2014"}</td>
             <td>${name}</td>
             <td>${setCode}</td>
             <td class="text-right text-mono">${money(rawPrice)}</td>
@@ -1508,7 +1508,7 @@ function renderRowsDemandSurge(list, start, count) {
         // Note: all values are escaped or numeric. innerHTML pattern matches existing codebase.
         tr.innerHTML = `
             <td class="text-center"><span class="${esc(rankClass(i + 1))}">${i + 1}</span></td>
-            <td>${imgUrl ? `<img src="${imgUrl}" alt="" style="width:42px;height:58px;object-fit:contain;" loading="lazy">` : "\u2014"}</td>
+            <td>${imgUrl ? `<img src="${imgUrl}" alt="" style="width:50px;height:70px;object-fit:contain;" loading="lazy">` : "\u2014"}</td>
             <td>${name}</td>
             <td>${setCode}</td>
             <td class="text-right text-mono">${money(psa10Price)}</td>
@@ -1574,7 +1574,7 @@ function renderRowsTopChase(list, start, count) {
         // Note: all values are escaped or numeric. innerHTML pattern matches existing codebase.
         tr.innerHTML = `
             <td class="text-center"><span class="${esc(rankClass(i + 1))}">${i + 1}</span></td>
-            <td>${imgUrl ? `<img src="${imgUrl}" alt="" style="width:42px;height:58px;object-fit:contain;" loading="lazy">` : "\u2014"}</td>
+            <td>${imgUrl ? `<img src="${imgUrl}" alt="" style="width:50px;height:70px;object-fit:contain;" loading="lazy">` : "\u2014"}</td>
             <td>${name}</td>
             <td>${setCode}</td>
             <td class="text-right text-mono">${money(psa10)}</td>
@@ -1740,7 +1740,7 @@ function renderRowsMustBuy(list, start, count) {
         // This innerHTML pattern is used throughout the existing codebase.
         tr.innerHTML = `
             <td class="text-center"><span class="${esc(rankClass(i + 1))}">${i + 1}</span></td>
-            <td>${imgUrl ? `<img src="${imgUrl}" alt="" style="width:42px;height:58px;object-fit:contain;" loading="lazy">` : "\u2014"}</td>
+            <td>${imgUrl ? `<img src="${imgUrl}" alt="" style="width:50px;height:70px;object-fit:contain;" loading="lazy">` : "\u2014"}</td>
             <td>${name}</td>
             <td>${setCode}</td>
             <td class="text-right text-mono">${money(psa10)}</td>
@@ -1808,7 +1808,7 @@ function renderRowsHolds(list, start, count) {
 
         tr.innerHTML = `
             <td class="text-center"><span class="${rankClass(i + 1)}">${i + 1}</span></td>
-            <td>${imgUrl ? `<img src="${imgUrl}" alt="" style="width:42px;height:58px;object-fit:contain;" loading="lazy">` : "\u2014"}</td>
+            <td>${imgUrl ? `<img src="${imgUrl}" alt="" style="width:50px;height:70px;object-fit:contain;" loading="lazy">` : "\u2014"}</td>
             <td>${name}</td>
             <td>${setCode}</td>
             <td><span style="font-size:10px;color:#404040;">${typeStr}</span></td>
