@@ -395,12 +395,11 @@ table.win-table thead th:hover {
 }
 
 table.win-table tbody td {
-    padding: 2px 6px;
+    padding: 3px 6px;
     border-bottom: 1px solid #e8e8e8;
     vertical-align: middle;
     white-space: nowrap;
     font-size: 12px;
-    line-height: 1.2;
 }
 
 table.win-table tbody tr:hover {
