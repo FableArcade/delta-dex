@@ -294,10 +294,7 @@
             white-space: nowrap;
         }
 
-        /* ---- Fixed window height across tabs (classic Windows feel) ---- */
-        .table-scroll {
-            min-height: 60vh;
-        }
+        /* Table scroll removed — window-body handles scroll now */
 
         /* ---- Mobile responsive ---- */
         @media (max-width: 768px) {
@@ -383,11 +380,7 @@
                 height: 49px !important;
             }
 
-            /* Table container scrolls horizontally */
-            .table-scroll {
-                min-height: 50vh;
-                max-height: 60vh;
-            }
+            /* Table container scrolls horizontally on mobile */
             .win-table-wrap {
                 overflow-x: auto;
                 -webkit-overflow-scrolling: touch;
@@ -434,7 +427,7 @@
 <div class="desktop">
 
     <!-- MAIN WINDOW -->
-    <div class="window" style="max-width: 1400px; margin: 0 auto;">
+    <div class="window">
 
         <!-- Title bar -->
         <div class="window-title">
@@ -459,8 +452,11 @@
             <a href="/about.html" class="menu-item">Help</a>
         </div>
 
+        <!-- Scrollable content area (window frame is fixed, this scrolls) -->
+        <div class="window-body" style="flex:1;overflow-y:auto;overflow-x:hidden;padding:0;">
+
         <!-- Hero -->
-        <div class="window-body" style="border-bottom: 2px groove var(--win-surface);">
+        <div style="padding:8px;border-bottom: 2px groove var(--win-surface);">
             <div class="flex items-center justify-between">
                 <div class="hero-text">
                     <div class="hero-title">opportunity finder</div>
@@ -600,7 +596,7 @@
         <!-- Table -->
         <div class="window-body-flush">
             <div class="win-table-wrap">
-                <div class="table-scroll" style="max-height: 70vh;">
+                <div class="table-scroll">
                     <table class="win-table" id="card-table">
                         <thead id="card-thead">
                             <!-- Populated dynamically by js/card_leaderboard.js based on view -->
@@ -627,7 +623,9 @@
             </div>
         </div>
 
-        <!-- Status bar -->
+        </div><!-- /scrollable content area -->
+
+        <!-- Status bar (pinned to bottom of window) -->
         <div class="statusbar">
             <div class="statusbar-field" id="status-msg">Ready</div>
             <div class="statusbar-field" style="flex:1" id="status-count">0 cards</div>

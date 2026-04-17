@@ -95,27 +95,63 @@
     // ------------------------------------------------------------------
 
     const ICONIC_NAMES = [
+        // S-tier: franchise faces
         [/charizard/i, 1.00], [/pikachu/i, 1.00], [/mewtwo/i, 0.96],
         [/\bmew\b/i, 0.96], [/umbreon/i, 0.96],
+        // A-tier: mascots and pillars
         [/lugia/i, 0.88], [/rayquaza/i, 0.88], [/gengar/i, 0.85],
         [/snorlax/i, 0.82], [/dragonite/i, 0.82],
         [/blastoise/i, 0.78], [/venusaur/i, 0.78], [/gyarados/i, 0.80],
         [/greninja/i, 0.82], [/lucario/i, 0.80], [/garchomp/i, 0.78],
         [/zoroark/i, 0.75], [/sceptile/i, 0.72], [/blaziken/i, 0.72],
         [/swampert/i, 0.72],
+        // Eeveelutions family (community darlings)
         [/sylveon/i, 0.78], [/espeon/i, 0.75], [/leafeon/i, 0.72],
         [/glaceon/i, 0.72], [/vaporeon/i, 0.70], [/jolteon/i, 0.70],
         [/flareon/i, 0.70], [/eevee/i, 0.72],
+        // Legendaries / mythicals
         [/giratina/i, 0.70], [/dialga/i, 0.65], [/palkia/i, 0.65],
         [/arceus/i, 0.72], [/zekrom|reshiram/i, 0.65],
         [/yveltal|xerneas/i, 0.62], [/groudon|kyogre/i, 0.65],
         [/zacian|zamazenta/i, 0.62], [/calyrex/i, 0.60],
+        [/\bho-?oh\b/i, 0.78], [/celebi/i, 0.70], [/jirachi/i, 0.68],
+        [/darkrai/i, 0.68], [/deoxys/i, 0.62], [/genesect/i, 0.55],
+        [/manaphy|phione/i, 0.55], [/shaymin/i, 0.58], [/victini/i, 0.60],
+        [/meloetta/i, 0.55], [/keldeo/i, 0.52], [/necrozma/i, 0.58],
+        [/tapu (koko|lele|bulu|fini)/i, 0.60],
+        [/solgaleo|lunala/i, 0.60], [/zeraora/i, 0.58], [/marshadow/i, 0.55],
+        [/eternatus/i, 0.58], [/koraidon|miraidon/i, 0.62],
+        [/terapagos/i, 0.65], [/ogerpon/i, 0.65],
+        // Meme / internet-culture tier (regional exclusives + meme Pokemon).
+        // These don't need "legendary" status — internet loves them, and
+        // that love reliably shows up in secondary-market demand for promos.
+        [/\bditto\b/i, 0.75],
+        [/psyduck/i, 0.70], [/magikarp/i, 0.68], [/slowpoke/i, 0.68],
+        [/slowbro/i, 0.65], [/slowking/i, 0.62],
+        [/\bsnom\b/i, 0.72], [/wooloo/i, 0.68], [/cubone/i, 0.70],
+        [/jigglypuff/i, 0.68], [/wigglytuff/i, 0.55],
+        [/\bgastly\b/i, 0.62], [/haunter/i, 0.65],
+        [/mimikyu/i, 0.78], [/gardevoir/i, 0.75], [/tinkaton/i, 0.68],
+        [/fuecoco/i, 0.62], [/quaxly/i, 0.60], [/sprigatito/i, 0.62],
+        [/ceruledge|armarouge/i, 0.60], [/annihilape/i, 0.55],
+        [/meowth/i, 0.72], [/farfetch'?d/i, 0.60], [/galvantula/i, 0.52],
+        [/\bbulbasaur\b/i, 0.72], [/squirtle/i, 0.72], [/charmander/i, 0.78],
+        [/kingambit/i, 0.55], [/roaring moon|iron (valiant|treads|hands|bundle|moth|leaves|jugulis|thorns|crown)/i, 0.55],
+        [/paradox pokemon/i, 0.50],
+        // Trainer / NPC — iconic characters
         [/cynthia/i, 0.75], [/lillie/i, 0.72], [/acerola/i, 0.70],
         [/iono/i, 0.68], [/marnie/i, 0.65],
         [/\bhop\b|\bleon\b/i, 0.55],
         [/\bN['\u2019]s\b/i, 0.65],
         [/team rocket/i, 0.60], [/giovanni/i, 0.62],
         [/erika/i, 0.55], [/misty/i, 0.62], [/brock/i, 0.55],
+        [/nemona|arven|penny|clavell/i, 0.58],
+        [/professor sada|professor turo/i, 0.55],
+        [/\bred\b|\bblue\b(?! )|\bgreen\b(?! )/i, 0.62],   // classic trainers, not color words
+        [/\bgold\b(?! )|\bsilver\b(?! )|\bcrystal\b(?! )/i, 0.58],
+        [/may |brendan/i, 0.52],
+        [/\bhilda\b|\bhilbert\b/i, 0.55], [/\brosa\b|\bnate\b/i, 0.52],
+        [/\byuna\b|\bnaru\b/i, 0.55],
     ];
     const RARITY_BONUS = {
         "Special Illustration Rare": 0.20,
@@ -686,7 +722,7 @@
      *
      * Returns { fitScore (0-100), rationale (string[]), components, filteredOut }
      */
-    function scoreForWishlist(card, { budget, horizon, setReturns }) {
+    function scoreForWishlist(card, { budget, horizon, setReturns, projections }) {
         const price = card["is-sealed"]
             ? Number(card["raw-price"])
             : Number(card["psa-10-price"]);
@@ -708,33 +744,175 @@
             return scoreForWishlistSealed(card, price, budget);
         }
 
-        // --- Compute all factors. null = missing data, not 0. ---
-        const cultural    = culturalImpactScore(card);
-        const peakDisc    = peakDiscountFactor(card);
-        const maDistance  = maDistanceFactor(card);      // audit v2
+        // === Budget Fit v3.2 — additive composite ================================
+        //
+        // Mirrors the Must Buy v3.2 philosophy: every signal earns bounded
+        // points toward a 0..100 scale. Model is the biggest single dimension
+        // (35 pts) but never drowns out cultural, demand, or the classic
+        // reversal setup. An 8th dimension — Budget Fit — rewards affordable
+        // sizing so "affordable model picks" is the distinct lens.
+        //
+        //   Model projection   ≤ 35   (baseRoi × 35, same math as Pure ROI)
+        //   Cultural moat      ≤ 15
+        //   Demand momentum    ≤ 15   (mustBuyStrength proxy)
+        //   Setup pattern      ≤ 15   (3 signals × 5 pts: off-peak, reversal,
+        //                              below MA — the classic dip-buy setup)
+        //   Budget fit         ≤ 15   (sweet spot 20-60% of budget)
+        //   Timing kicker      ≤ 5    (confLow > 0 bonus)
+        //   ───────────────
+        //                   ≤ 100
+        //
+        // No multiplicative cascade. Cards over budget are still filtered
+        // out at the top of the function before this runs.
+
+        const cultural = culturalImpactScore(card);
+        const peakDisc = peakDiscountFactor(card);
+        const maDistance = maDistanceFactor(card);
+        const reversal = reversalFactor(card);
+        const mustBuy = mustBuyStrength(card);
+        const fit = budgetFit(price, budget);
+
+        const proj = projections ? projections[String(card.id)] : null;
+        const projReturn = proj ? Number(proj["projected-return"]) : NaN;
+        const confLow    = proj ? Number(proj["confidence-low"])   : NaN;
+        const confHigh   = proj ? Number(proj["confidence-high"])  : NaN;
+        const confWidth  = proj ? Number(proj["confidence-width"])
+                                : NaN;
+
+        if (Number.isFinite(projReturn)) {
+            // modelScore maps projected return: 0%→0, 15%→0.5, 30%+→1.0.
+            let modelScore;
+            if (projReturn < 0) {
+                modelScore = Math.max(0, 0.10 + projReturn);
+            } else {
+                modelScore = clamp01(projReturn / 0.30);
+            }
+
+            const confMult = !Number.isFinite(confWidth) ? 0.7
+                           : confWidth < 0.15 ? 1.0
+                           : confWidth < 0.30 ? 0.7
+                           : 0.4;
+            const confLabel = !Number.isFinite(confWidth) ? "—"
+                            : confWidth < 0.15 ? "HIGH"
+                            : confWidth < 0.30 ? "MED"
+                            : "LOW";
+
+            // baseRoi — the Pure ROI building block (0..~1.3). Bring onto
+            // 0..1 before awarding points so the 35-pt ceiling isn't broken.
+            const baseRoi = modelScore * confMult;
+            const modelPts = clamp01(baseRoi) * 35;
+
+            // Setup pattern — three classic dip-buy signals, 5 pts each.
+            const isOffPeak   = (peakDisc   != null && peakDisc   >= 0.15) ? 1 : 0;
+            const isReversal  = (reversal   != null && reversal   >= 0.50) ? 1 : 0;
+            const isBelowMa   = (maDistance != null && maDistance >= 0.55) ? 1 : 0;
+            const setupPts    = (isOffPeak + isReversal + isBelowMa) * 5;
+            const setupSignals = { isOffPeak, isReversal, isBelowMa };
+
+            // Demand proxy — mustBuyStrength is the closest single-number
+            // demand pressure metric we compute in wishlist_store.
+            const demandPts = (mustBuy != null ? mustBuy : 0) * 15;
+
+            // Budget fit — inherit the existing sweet-spot curve, but award
+            // points additively instead of multiplying.
+            const budgetFitPts = fit * 15;
+
+            // Timing kicker — 5 pts when the model's downside band is above
+            // zero (even worst case is profitable). Small but meaningful.
+            const timingPts = (Number.isFinite(confLow) && confLow > 0) ? 5 : 0;
+
+            const culturalPts = cultural * 15;
+
+            const rawScore = modelPts + culturalPts + demandPts
+                           + setupPts + budgetFitPts + timingPts;
+            const fitScore = Math.round(Math.min(100, rawScore));
+
+            // --- Rationale ---
+            const rationale = [];
+            const signedPct = (v) => (v >= 0 ? "+" : "") + Math.round(v * 100) + "%";
+            const ptsStr = (v, max) => `${Math.round(v)}/${max}`;
+
+            rationale.push(
+                `Model projects ${signedPct(projReturn)} (180d net)` +
+                (Number.isFinite(confLow) && Number.isFinite(confHigh)
+                    ? ` — conf [${signedPct(confLow)}, ${signedPct(confHigh)}] ${confLabel}`
+                    : "") +
+                ` → ${ptsStr(modelPts, 35)} pts`
+            );
+            if (timingPts > 0) rationale.push(`✚ downside band above zero → +${timingPts} pts`);
+
+            if (cultural >= 0.75)      rationale.push(`Iconic moat (${Math.round(cultural * 100)}%) → ${ptsStr(culturalPts, 15)} pts`);
+            else if (cultural >= 0.45) rationale.push(`Strong cultural (${Math.round(cultural * 100)}%) → ${ptsStr(culturalPts, 15)} pts`);
+            else if (cultural >= 0.20) rationale.push(`Moderate cultural (${Math.round(cultural * 100)}%) → ${ptsStr(culturalPts, 15)} pts`);
+            else                       rationale.push(`Weak cultural floor → ${ptsStr(culturalPts, 15)} pts`);
+
+            if (mustBuy != null) {
+                rationale.push(`Demand strength ${Math.round(mustBuy * 100)}% → ${ptsStr(demandPts, 15)} pts`);
+            }
+
+            const setupLabels = [];
+            if (isOffPeak)  setupLabels.push("off-peak");
+            if (isReversal) setupLabels.push("reversal");
+            if (isBelowMa)  setupLabels.push("below MA");
+            rationale.push(
+                `Setup pattern: ${setupLabels.length ? setupLabels.join(" + ") : "none"} → ${setupPts}/15 pts`
+            );
+            if (peakDisc != null) {
+                const pct = Math.round(peakDisc * 100);
+                if      (peakDisc >= 0.40) rationale.push(`${pct}% off 12mo peak (strong dip)`);
+                else if (peakDisc >= 0.20) rationale.push(`${pct}% off 12mo peak (mild dip)`);
+                else if (peakDisc >= 0.05) rationale.push(`${pct}% off peak`);
+            }
+
+            const budgetPct = Number.isFinite(budget) && budget > 0 ? price / budget : null;
+            if (budgetPct != null) {
+                const bp = Math.round(budgetPct * 100);
+                if      (budgetPct < 0.20)  rationale.push(`Small position (${bp}% of budget) → ${ptsStr(budgetFitPts, 15)} pts`);
+                else if (budgetPct > 0.80)  rationale.push(`Concentration risk (${bp}% of budget) → ${ptsStr(budgetFitPts, 15)} pts`);
+                else                         rationale.push(`Sized well (${bp}% of budget) → ${ptsStr(budgetFitPts, 15)} pts`);
+            }
+
+            _appendAlphaWarnings(rationale, card);
+            _appendPsaPopWarnings(rationale, card);
+
+            return {
+                fitScore,
+                rationale,
+                components: {
+                    modelScore, confMult, confLabel, baseRoi,
+                    cultural, peakDisc, maDistance, reversal, mustBuy,
+                    setupSignals, setupPts,
+                    fit, budgetFitPts,
+                    modelPts, culturalPts, demandPts, timingPts,
+                    price, projReturn, confLow, confHigh, confWidth,
+                },
+                filteredOut: false,
+            };
+        }
+
+        // ---- FALLBACK (no projection available) -------------------------------
+        // Preserves the old mean-reversion composite for cards the model
+        // hasn't seen yet (new promos, thin history). Users see this rationale
+        // when the model can't weigh in.
+        // (cultural, peakDisc, maDistance, reversal, mustBuy, fit already
+        //  declared above — reuse rather than re-declare.)
+
         const vol         = volatilityFactor(card);
-        const reversal    = reversalFactor(card);
         const sizeDisc    = sizeDiscountFactor(card);
-        const mustBuy     = mustBuyStrength(card);       // current-market demand proxy
-        const setAlpha    = setAlphaFactor(card, setReturns); // audit v3 — peer-relative
+        const setAlpha    = setAlphaFactor(card, setReturns);
 
         const w = horizonWeights(horizon);
-
-        // Weighted sum, redistributing the weight of any missing factor
-        // across the present ones (so a card with partial data still
-        // ranks fairly, not zero).
         const parts = [
-            { value: peakDisc,   weight: w.peakDisc,     label: "peakDisc" },
-            { value: maDistance, weight: w.maDistance,   label: "maDistance" },
-            { value: vol,        weight: w.volatility,   label: "volatility" },
-            { value: cultural,   weight: w.cultural,     label: "cultural" },
-            { value: reversal,   weight: w.reversal,     label: "reversal" },
-            { value: setAlpha,   weight: w.setAlpha,     label: "setAlpha" },
-            { value: sizeDisc,   weight: w.sizeDiscount, label: "sizeDiscount" },
-            { value: mustBuy,    weight: w.mustBuy,      label: "mustBuy" },
+            { value: peakDisc,   weight: w.peakDisc },
+            { value: maDistance, weight: w.maDistance },
+            { value: vol,        weight: w.volatility },
+            { value: cultural,   weight: w.cultural },
+            { value: reversal,   weight: w.reversal },
+            { value: setAlpha,   weight: w.setAlpha },
+            { value: sizeDisc,   weight: w.sizeDiscount },
+            { value: mustBuy,    weight: w.mustBuy },
         ];
-        let totalWeight = 0;
-        let base = 0;
+        let totalWeight = 0, base = 0;
         for (const p of parts) {
             if (p.value == null) continue;
             base += p.value * p.weight;
@@ -742,17 +920,6 @@
         }
         base = totalWeight > 0 ? base / totalWeight : 0;
 
-        const fit = budgetFit(price, budget);
-
-        // Conviction bonus/penalty — audit v2 calibration:
-        //
-        // The peak-discount × cultural deep dive showed that MOAT cards at
-        // just 10% off peak already produce +6.55% forward 3m returns. The
-        // old threshold of 0.25 was too high — it was missing the sweet spot
-        // for iconic dip buys. Lower threshold to 0.10.
-        //
-        // "Dead no moat" penalty unchanged — cards down hard with no brand
-        // floor are value traps, not bargains.
         let convictionFactor = 1.0;
         const isDipBuy   = (peakDisc != null && peakDisc >= 0.10) && cultural >= 0.45;
         const deadNoMoat = (reversal != null && reversal >= 0.70) && cultural < 0.20;
@@ -761,93 +928,21 @@
 
         const fitScore = Math.round(clamp01(base * fit * convictionFactor) * 100);
 
-        // --- Build human-readable rationale ---
-        const rationale = [];
-
-        // Cultural framing comes first — it's the "why would anyone want this" anchor
-        if (cultural >= 0.75) rationale.push(`Iconic moat (${Math.round(cultural * 100)}%)`);
+        const rationale = ["Model has no projection for this card — using fallback value composite."];
+        if (cultural >= 0.75)      rationale.push(`Iconic moat (${Math.round(cultural * 100)}%)`);
         else if (cultural >= 0.45) rationale.push(`Strong cultural (${Math.round(cultural * 100)}%)`);
         else if (cultural >= 0.20) rationale.push(`Moderate cultural (${Math.round(cultural * 100)}%)`);
-        else rationale.push(`Weak cultural floor`);
-
-        // Peak discount is the #1 signal, report it prominently
+        else                       rationale.push(`Weak cultural floor`);
         if (peakDisc != null) {
             const pct = Math.round(peakDisc * 100);
             if (peakDisc >= 0.40)      rationale.push(`${pct}% off 12mo peak (strong dip)`);
             else if (peakDisc >= 0.20) rationale.push(`${pct}% off 12mo peak (mild dip)`);
             else if (peakDisc >= 0.05) rationale.push(`${pct}% off peak`);
-            else                        rationale.push(`At/near 12mo peak (no discount)`);
         }
-
-        // Reversal signal (opposite of weighted multi-horizon momentum)
-        if (reversal != null) {
-            const wm = weightedMomentum(card);
-            if (wm != null) {
-                const pct = Math.round(wm * 100);
-                if      (wm <= -0.15) rationale.push(`Weighted momentum ${pct}% (strong reversal setup)`);
-                else if (wm <= -0.05) rationale.push(`Weighted momentum ${pct}% (mild reversal)`);
-                else if (wm >=  0.15) rationale.push(`Weighted momentum +${pct}% (late to the move)`);
-                else                  rationale.push(`Flat weighted momentum (no clear signal)`);
-            }
-        }
-
-        // Volatility
-        if (vol != null) {
-            if (vol >= 0.6) rationale.push(`High volatility (mean-reversion opportunity)`);
-            else if (vol >= 0.3) rationale.push(`Moderate volatility`);
-            else rationale.push(`Low volatility (stable thesis)`);
-        }
-
-        // NEW: moving-average distance (strongest new signal in audit v2)
-        if (maDistance != null) {
-            if (maDistance >= 0.70) rationale.push(`Below moving avg (oversold)`);
-            else if (maDistance >= 0.55) rationale.push(`Slightly below moving avg`);
-            else if (maDistance >= 0.45) rationale.push(`At moving avg`);
-            else rationale.push(`Above moving avg (bought-in)`);
-        }
-
-        // NEW audit v3: card alpha vs set-wide median return
-        if (setAlpha != null && setReturns) {
-            const a = priceAnchors(card);
-            const setCode = card["set-code"];
-            const setMedian = setReturns[setCode]?.["median-90d-return"];
-            if (Number.isFinite(a.p90) && a.p90 > 0 && setMedian != null) {
-                const cardRet = (a.current / a.p90) - 1;
-                const alphaPct = Math.round((cardRet - setMedian) * 100);
-                if (alphaPct <= -10)      rationale.push(`Lagging set by ${Math.abs(alphaPct)}pp (peer reversal)`);
-                else if (alphaPct <= -3)  rationale.push(`Slightly behind set (${alphaPct}pp)`);
-                else if (alphaPct >= 10)  rationale.push(`Beating set by +${alphaPct}pp (late to the move)`);
-                else                      rationale.push(`In line with set (${alphaPct >= 0 ? "+" : ""}${alphaPct}pp)`);
-            }
-        }
-
-        // MustBuy — current-market demand, kept as a secondary signal
-        if (mustBuy != null) {
-            if (mustBuy >= 0.70) rationale.push("Strong current-market setup");
-            else if (mustBuy >= 0.50) rationale.push("Decent current-market setup");
-        }
-
-        // Budget fit
-        const pct = Number.isFinite(budget) && budget > 0 ? price / budget : null;
-        if (pct != null) {
-            if (pct < 0.20) rationale.push(`Small position (${Math.round(pct * 100)}% of budget)`);
-            else if (pct > 0.80) rationale.push(`Concentration risk (${Math.round(pct * 100)}% of budget)`);
-            else rationale.push(`Sized well (${Math.round(pct * 100)}% of budget)`);
-        }
-
-        // Conviction layer
         if (convictionFactor > 1) rationale.push("✚ iconic-dip bonus");
         if (convictionFactor < 1) rationale.push("− falling + no moat penalty");
-
-        // Confidence warning — audit v2 found the backtest was 96% cheap
-        // (<$100) no-moat cards. The signal is substantially weaker on
-        // expensive iconic cards (where users actually shop). Flag them so
-        // users know to treat the score as directional, not precise.
-        const isExpensive = price >= 500;
-        const isIconic = cultural >= 0.80;
-        if (isExpensive && isIconic) {
-            rationale.push("⚠ lower-confidence zone (thin backtest data)");
-        }
+        _appendAlphaWarnings(rationale, card);
+        _appendPsaPopWarnings(rationale, card);
 
         return {
             fitScore,
@@ -858,6 +953,47 @@
             },
             filteredOut: false,
         };
+    }
+
+    // Set-alpha linkage warning extracted so both branches share it.
+    function _appendAlphaWarnings(rationale, card) {
+        const alphaId      = card["alpha-card-id"];
+        const alphaCorr    = Number(card["alpha-contemp-corr"]);
+        const alphaName    = card["alpha-name"];
+        const alphaCur     = Number(card["alpha-psa10-current"]);
+        const alpha30      = Number(card["alpha-psa10-30d-ago"]);
+        const alpha90      = Number(card["alpha-psa10-90d-ago"]);
+        const isAlphaItself = alphaId && String(alphaId) === String(card.id);
+        if (!isAlphaItself && Number.isFinite(alphaCorr) && alphaCorr >= 0.50
+            && Number.isFinite(alphaCur) && alphaCur > 0) {
+            const a30 = Number.isFinite(alpha30) && alpha30 > 0 ? alphaCur / alpha30 - 1 : null;
+            const a90 = Number.isFinite(alpha90) && alpha90 > 0 ? alphaCur / alpha90 - 1 : null;
+            const alphaShort = alphaName ? alphaName.replace(/\s*#\d+\s*$/, "") : "set alpha";
+            if (a30 != null && a30 <= -0.10) {
+                rationale.push(`⚠ ${alphaShort} (set alpha) down ${Math.round(a30 * 100)}% in 30d — beta linkage ρ=${alphaCorr.toFixed(2)}, expect drag next month`);
+            } else if (a30 != null && a30 <= -0.03 && (a90 == null || a90 < 0)) {
+                rationale.push(`⚠ ${alphaShort} (set alpha) softening (${Math.round(a30 * 100)}% 30d) — ρ=${alphaCorr.toFixed(2)}, watch for beta drag`);
+            } else if (a30 != null && a30 >= 0.05) {
+                rationale.push(`${alphaShort} (set alpha) +${Math.round(a30 * 100)}% 30d — positive drag for ρ=${alphaCorr.toFixed(2)} beta`);
+            } else {
+                rationale.push(`Tracks ${alphaShort} (set alpha, ρ=${alphaCorr.toFixed(2)}) — watch that chart`);
+            }
+        }
+    }
+
+    function _appendPsaPopWarnings(rationale, card) {
+        const pop     = Number(card["psa-10-pop"]);
+        const popPrev = Number(card["psa-10-pop-prev"]);
+        if (Number.isFinite(pop) && Number.isFinite(popPrev) && popPrev > 0) {
+            const popGrowth = pop / popPrev - 1;
+            if (popGrowth >= 2.0) {
+                rationale.push(`⚠ PSA 10 pop ${popPrev}→${pop} (+${Math.round(popGrowth * 100)}%) — severe grading wave`);
+            } else if (popGrowth >= 0.50) {
+                rationale.push(`⚠ PSA 10 pop +${Math.round(popGrowth * 100)}% MoM — active grading wave`);
+            } else if (popGrowth >= 0.20) {
+                rationale.push(`⚠ PSA 10 pop +${Math.round(popGrowth * 100)}% MoM — supply still expanding`);
+            }
+        }
     }
 
     // ------------------------------------------------------------------

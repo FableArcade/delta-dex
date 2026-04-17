@@ -543,7 +543,7 @@
             const price = c["is-sealed"]
                 ? Number(c["raw-price"])
                 : Number(c["psa-10-price"]);
-            const scored = window.WishlistStore.scoreForWishlist(c, { budget, horizon, setReturns });
+            const scored = window.WishlistStore.scoreForWishlist(c, { budget, horizon, setReturns, projections });
             const roi = computeRoiScore(c, horizon);
             joined.push({
                 entry, card: c, price, budget, scored,

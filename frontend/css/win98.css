@@ -82,12 +82,20 @@ body {
    ============================================================ */
 
 .desktop {
-    padding: 8px;
-    min-height: 100vh;
+    /* Desktop fills the viewport above the taskbar. No scroll on the desktop
+       itself — the window is maximized and pinned. */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 32px;  /* taskbar height */
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
 }
 
 /* ============================================================
-   Window
+   Window — maximized, fills the desktop, never moves
    ============================================================ */
 
 .window {
@@ -95,8 +103,18 @@ body {
     box-shadow: var(--bevel-raised);
     display: flex;
     flex-direction: column;
-    margin-bottom: 8px;
-    min-height: 80vh;
+    width: 100%;
+    max-width: 1400px;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* The window body area scrolls; the window frame does not */
+.window > .window-body,
+.window > .window-body-flush {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .window-title {
