@@ -297,6 +297,10 @@ body {
     font-family: inherit;
     font-weight: bold;
     font-size: 11px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
 }
 .back-btn:active { box-shadow: var(--bevel-sunken); }
 
@@ -307,12 +311,14 @@ body {
     box-shadow: var(--bevel-raised);
     border: none;
     cursor: pointer;
-    display: flex;
+    display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 4px;
     font-family: inherit;
     font-weight: bold;
     font-size: 12px;
+    line-height: 1;
 }
 
 .start-btn:active {
