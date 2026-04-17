@@ -299,35 +299,35 @@
 
         /* ---- Mobile responsive ---- */
         @media (max-width: 768px) {
-            .window { margin: 0 !important; }
-            .desktop { padding: 0; }
-            .delta-badge { font-size: 10px; padding: 2px 8px; }
+            .desktop { padding: 0; bottom: 28px; }
+            .delta-badge { font-size: 8px; padding: 1px 6px; top: 2px; right: 4px; }
 
-            /* Tabs: wrap and fill width */
+            /* Title bar compact */
+            .window-title { padding: 2px 4px; font-size: 11px; }
+
+            /* Hide era filter on mobile — too many buttons */
+            .era-filter-row { display: none !important; }
+
+            /* Tabs: compact single row, horizontally scrollable */
+            .opp-toolbar {
+                padding: 3px 6px;
+                gap: 4px;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
             .opp-tabs {
-                width: 100%;
-                flex-wrap: wrap;
+                flex-wrap: nowrap;
+                gap: 2px;
             }
             .opp-tab {
-                font-size: 10px;
-                padding: 0 8px;
-                height: 28px;
-                flex: 1 1 auto;
-                min-width: 0;
+                font-size: 9px;
+                padding: 0 6px;
+                height: 22px;
                 white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
+                flex-shrink: 0;
             }
 
-            /* Toolbar stacks vertically */
-            .opp-toolbar {
-                flex-direction: column;
-                align-items: stretch;
-                gap: 6px;
-                padding: 6px 8px;
-            }
-
-            /* Controls wrap tighter */
+            /* Controls: compact inline row */
             .opp-controls-ev,
             .opp-controls-holds,
             .opp-controls-mustbuy,
@@ -337,88 +337,60 @@
             .opp-controls-bestgrading,
             .opp-controls-sentiment {
                 flex-wrap: wrap;
-                gap: 6px;
-                font-size: 11px;
-            }
-            .opp-control { font-size: 11px; }
-            .opp-philosophy { white-space: normal; font-size: 10px; }
-            .opp-formula-note { font-size: 9px; }
-
-            /* Era filter wraps */
-            .era-filter {
-                flex-wrap: wrap;
                 gap: 4px;
+                font-size: 10px;
             }
-            .era-btn {
-                font-size: 10px !important;
-                padding: 0 6px !important;
-                height: 22px !important;
-            }
+            .opp-control { font-size: 10px; }
+            .opp-control label { font-size: 9px; }
+            .opp-control input[type="number"] { width: 50px; }
 
-            /* Table: smaller font, tighter padding for phone */
+            /* Hide formula notes + philosophy on mobile */
+            .opp-philosophy { display: none; }
+            .opp-formula-note { display: none; }
+
+            /* Range slider smaller */
+            .range-slider { width: 100px; }
+
+            /* Table: tighter, horizontal scroll */
             table.win-table { font-size: 11px; }
             table.win-table thead th {
-                padding: 3px 4px;
-                font-size: 9px;
+                padding: 2px 3px;
+                font-size: 8px;
             }
             table.win-table tbody td {
-                padding: 4px 4px;
+                padding: 3px 3px;
                 font-size: 11px;
             }
-            /* Hide less critical columns on mobile */
+
+            /* Hide IMAGE and SET columns on mobile */
             table.win-table thead th:nth-child(2),
-            table.win-table tbody td:nth-child(2) {
-                display: none; /* hide IMAGE column */
-            }
+            table.win-table tbody td:nth-child(2) { display: none; }
             table.win-table thead th:nth-child(4),
-            table.win-table tbody td:nth-child(4) {
-                display: none; /* hide SET column */
-            }
+            table.win-table tbody td:nth-child(4) { display: none; }
 
-            /* Card images in table */
-            table.win-table tbody td img {
-                width: 35px !important;
-                height: 49px !important;
-            }
-
-            /* Table container scrolls horizontally on mobile */
+            /* Table horizontal scroll */
             .win-table-wrap {
                 overflow-x: auto;
                 -webkit-overflow-scrolling: touch;
             }
 
-            /* Distribution chart shorter */
-            .dist-chart-wrap { height: 120px; }
-            .dist-chart-title { font-size: 11px; }
-            .dist-chart-sub { font-size: 9px; }
-
-            /* Description text */
-            .window-body p { font-size: 11px; }
-
-            /* Range slider fits phone */
-            .range-slider { width: 140px; }
-
-            /* Tooltip repositioning */
+            /* Tooltips */
             [data-tip]::after {
-                min-width: 180px;
-                max-width: 260px;
-                font-size: 10px;
+                min-width: 160px;
+                max-width: 240px;
+                font-size: 9px;
                 right: auto;
                 left: 0;
             }
 
             /* Taskbar */
             .taskbar { height: 28px; }
-            .start-btn { font-size: 11px; padding: 0 8px; }
-            .taskbar-task { font-size: 10px; }
-        }
+            .start-btn { font-size: 10px; padding: 0 6px; }
+            .taskbar-task { font-size: 9px; }
 
-        /* Small phones */
-        @media (max-width: 400px) {
-            .opp-tab { font-size: 9px; padding: 0 5px; }
-            table.win-table { font-size: 10px; }
-            table.win-table thead th { font-size: 8px; padding: 2px 3px; }
-            table.win-table tbody td { padding: 3px 3px; font-size: 10px; }
+            /* Status bar */
+            .statusbar { font-size: 9px; }
+            .statusbar-field { font-size: 9px; padding: 1px 4px; }
         }
     </style>
 </head>
@@ -467,7 +439,7 @@
 
         <!-- Era filter + toolbar pinned above the scroll area -->
         <!-- Era filter (applies to all tabs) -->
-        <div style="padding:4px 12px;background:var(--win-surface);border-bottom:1px solid #a0a0a0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div class="era-filter-row" style="padding:4px 12px;background:var(--win-surface);border-bottom:1px solid #a0a0a0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <label style="font-size:10px;font-weight:bold;text-transform:uppercase;color:#404040;">Era Filter:</label>
             <div class="era-tabs" style="display:flex;gap:2px;">
                 <button class="era-btn active" data-era="all"   style="height:24px;padding:0 10px;background:#dfdfdf;box-shadow:var(--bevel-sunken);border:none;cursor:pointer;font-family:inherit;font-size:11px;font-weight:bold;">All Eras</button>

@@ -248,9 +248,10 @@ body {
 }
 
 @media (max-width: 768px) {
-    .menubar .menu-item { display: none; }
-    .menubar .updated-badge { display: none; }
+    .menubar > .menu-item { display: none; }
+    .menubar > .updated-badge { display: none; }
     .menu-hamburger { display: block; }
+    .menu-dropdown .menu-item { display: block; }
 }
 
 /* ============================================================
