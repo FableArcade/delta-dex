@@ -324,12 +324,11 @@
             /* Hide era filter on mobile — too many buttons */
             .era-filter-row { display: none !important; }
 
-            /* Tabs: compact single row, horizontally scrollable */
+            /* Tabs: compact, toolbar wraps so controls show below */
             .opp-toolbar {
                 padding: 3px 6px;
                 gap: 4px;
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
+                flex-wrap: wrap;
             }
             .opp-tabs {
                 flex-wrap: nowrap;
@@ -395,18 +394,20 @@
                 height: 50px !important;
             }
 
-            /* Mobile columns: keep #(1) IMAGE(2) NAME(3) PSA10(5) DIP%(8) SCORE(12)
-               Hide: SET(4) ATH(6) ATHDATE(7) SATIDX(9) NF7D(10) NF30D(11) */
+            /* Mobile: hide middle columns, keep first 5 + last column visible.
+               Buy the Dip (12 cols): #,IMG,NAME,SET,PSA10, [ATH,ATHDATE,DIP%,SAT,NF7,NF30], SCORE
+               Holds (11 cols): #,IMG,NAME,SET,CURRENT, [PEAK,DATA,CULTURE,APPREC,OFFPEAK], SCORE
+               Hide 6,7,8,9,10 covers the middle for both layouts. */
             table.win-table thead th:nth-child(6),
             table.win-table tbody td:nth-child(6) { display: none; }
             table.win-table thead th:nth-child(7),
             table.win-table tbody td:nth-child(7) { display: none; }
+            table.win-table thead th:nth-child(8),
+            table.win-table tbody td:nth-child(8) { display: none; }
             table.win-table thead th:nth-child(9),
             table.win-table tbody td:nth-child(9) { display: none; }
             table.win-table thead th:nth-child(10),
             table.win-table tbody td:nth-child(10) { display: none; }
-            table.win-table thead th:nth-child(11),
-            table.win-table tbody td:nth-child(11) { display: none; }
 
             /* Table horizontal scroll */
             .win-table-wrap {

@@ -1249,7 +1249,6 @@ const HEADERS = {
         { key: "none",     label: "IMAGE",     width: 60 },
         { key: "name",     label: "CARD / PRODUCT" },
         { key: "set",      label: "SET" },
-        { key: "type",     label: "TYPE" },
         { key: "current",  label: "CURRENT" },
         { key: "peak",     label: "12MO PEAK" },
         { key: "anchor",   label: "DATA" },
@@ -1811,7 +1810,6 @@ function renderRowsHolds(list, start, count) {
             <td>${imgUrl ? `<img src="${imgUrl}" alt="" style="width:56px;height:78px;object-fit:contain;" loading="lazy">` : "\u2014"}</td>
             <td>${name}</td>
             <td>${setCode}</td>
-            <td><span style="font-size:10px;color:#404040;">${typeStr}</span></td>
             <td class="text-right text-mono">${money(h.current)}</td>
             <td class="text-right text-mono" style="color:#606060;">${money(h.peak)}</td>
             <td class="text-center">${anchorBadge}</td>
