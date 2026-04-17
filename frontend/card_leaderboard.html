@@ -411,20 +411,77 @@
                 height: 50px !important;
             }
 
-            /* Mobile: hide middle columns, keep first 5 + last column visible.
-               Buy the Dip (12 cols): #,IMG,NAME,SET,PSA10, [ATH,ATHDATE,DIP%,SAT,NF7,NF30], SCORE
-               Holds (11 cols): #,IMG,NAME,SET,CURRENT, [PEAK,DATA,CULTURE,APPREC,OFFPEAK], SCORE
-               Hide 6,7,8,9,10 covers the middle for both layouts. */
-            table.win-table thead th:nth-child(6),
-            table.win-table tbody td:nth-child(6) { display: none; }
-            table.win-table thead th:nth-child(7),
-            table.win-table tbody td:nth-child(7) { display: none; }
-            table.win-table thead th:nth-child(8),
-            table.win-table tbody td:nth-child(8) { display: none; }
-            table.win-table thead th:nth-child(9),
-            table.win-table tbody td:nth-child(9) { display: none; }
-            table.win-table thead th:nth-child(10),
-            table.win-table tbody td:nth-child(10) { display: none; }
+            /* Per-tab mobile column hiding via table[data-view].
+               Each tab keeps: #(1), IMAGE(2), NAME(3), + 2-3 key columns + SCORE(last).
+               SET(4) hidden on all tabs. */
+            table.win-table[data-view] thead th:nth-child(4),
+            table.win-table[data-view] tbody td:nth-child(4) { display: none; }
+
+            /* Buy the Dip (12 cols): keep PSA10(5), NF30D(8→moved), SCORE(12)
+               Hide: ATH(6), ATHDATE(7), SATIDX(9), NF7D(10), NF30D(11) */
+            table.win-table[data-view="buythedip"] thead th:nth-child(6),
+            table.win-table[data-view="buythedip"] tbody td:nth-child(6),
+            table.win-table[data-view="buythedip"] thead th:nth-child(7),
+            table.win-table[data-view="buythedip"] tbody td:nth-child(7),
+            table.win-table[data-view="buythedip"] thead th:nth-child(9),
+            table.win-table[data-view="buythedip"] tbody td:nth-child(9),
+            table.win-table[data-view="buythedip"] thead th:nth-child(10),
+            table.win-table[data-view="buythedip"] tbody td:nth-child(10),
+            table.win-table[data-view="buythedip"] thead th:nth-child(11),
+            table.win-table[data-view="buythedip"] tbody td:nth-child(11) { display: none; }
+
+            /* Top Picks (11 cols): keep PSA10(5), SCORE(11)
+               Hide: PROJ(6), CONF(7), CULTURE(8), DEMAND(9), SCARCITY(10) */
+            table.win-table[data-view="mustbuy"] thead th:nth-child(6),
+            table.win-table[data-view="mustbuy"] tbody td:nth-child(6),
+            table.win-table[data-view="mustbuy"] thead th:nth-child(7),
+            table.win-table[data-view="mustbuy"] tbody td:nth-child(7),
+            table.win-table[data-view="mustbuy"] thead th:nth-child(8),
+            table.win-table[data-view="mustbuy"] tbody td:nth-child(8),
+            table.win-table[data-view="mustbuy"] thead th:nth-child(9),
+            table.win-table[data-view="mustbuy"] tbody td:nth-child(9),
+            table.win-table[data-view="mustbuy"] thead th:nth-child(10),
+            table.win-table[data-view="mustbuy"] tbody td:nth-child(10) { display: none; }
+
+            /* Top Chase (9 cols): keep PSA10(5), CHASE(9)
+               Hide: PROJ(6), CULTURE(7), NF30D(8) */
+            table.win-table[data-view="topchase"] thead th:nth-child(6),
+            table.win-table[data-view="topchase"] tbody td:nth-child(6),
+            table.win-table[data-view="topchase"] thead th:nth-child(7),
+            table.win-table[data-view="topchase"] tbody td:nth-child(7),
+            table.win-table[data-view="topchase"] thead th:nth-child(8),
+            table.win-table[data-view="topchase"] tbody td:nth-child(8) { display: none; }
+
+            /* Demand Surge (10 cols): keep PSA10(5), D/S RATIO(6), NF%(7)
+               Hide: PROJ(8), DEMAND(9), SUPPLY(10) */
+            table.win-table[data-view="demandsurge"] thead th:nth-child(8),
+            table.win-table[data-view="demandsurge"] tbody td:nth-child(8),
+            table.win-table[data-view="demandsurge"] thead th:nth-child(9),
+            table.win-table[data-view="demandsurge"] tbody td:nth-child(9),
+            table.win-table[data-view="demandsurge"] thead th:nth-child(10),
+            table.win-table[data-view="demandsurge"] tbody td:nth-child(10) { display: none; }
+
+            /* Best Grading (10 cols): keep PSA10(5), ROI%(6), EV$(7)
+               Hide: RAW(8), GEM%(9), PAYOUT(10) */
+            table.win-table[data-view="bestgrading"] thead th:nth-child(8),
+            table.win-table[data-view="bestgrading"] tbody td:nth-child(8),
+            table.win-table[data-view="bestgrading"] thead th:nth-child(9),
+            table.win-table[data-view="bestgrading"] tbody td:nth-child(9),
+            table.win-table[data-view="bestgrading"] thead th:nth-child(10),
+            table.win-table[data-view="bestgrading"] tbody td:nth-child(10) { display: none; }
+
+            /* Long-Term Holds (11 cols): keep CURRENT(5), SCORE(11)
+               Hide: PEAK(6), DATA(7), CULTURE(8), APPREC(9), OFFPEAK(10) */
+            table.win-table[data-view="holds"] thead th:nth-child(6),
+            table.win-table[data-view="holds"] tbody td:nth-child(6),
+            table.win-table[data-view="holds"] thead th:nth-child(7),
+            table.win-table[data-view="holds"] tbody td:nth-child(7),
+            table.win-table[data-view="holds"] thead th:nth-child(8),
+            table.win-table[data-view="holds"] tbody td:nth-child(8),
+            table.win-table[data-view="holds"] thead th:nth-child(9),
+            table.win-table[data-view="holds"] tbody td:nth-child(9),
+            table.win-table[data-view="holds"] thead th:nth-child(10),
+            table.win-table[data-view="holds"] tbody td:nth-child(10) { display: none; }
 
             /* Table horizontal scroll */
             .win-table-wrap {

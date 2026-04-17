@@ -1331,6 +1331,8 @@ function renderThead() {
     }
     thead.innerHTML = "";
     thead.appendChild(tr);
+    // Set view attribute on table so CSS can do per-tab column hiding
+    document.getElementById("card-table").dataset.view = view;
 }
 
 // --- row rendering (per-view) ---
