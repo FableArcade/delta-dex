@@ -14,9 +14,9 @@
         .opp-toolbar {
             display: flex;
             flex-wrap: wrap;
-            gap: 12px;
+            gap: 6px;
             align-items: center;
-            padding: 8px 12px;
+            padding: 4px 12px;
             border-bottom: 2px groove var(--win-surface);
             background: var(--win-surface);
         }
@@ -452,11 +452,9 @@
             <a href="/about.html" class="menu-item">Help</a>
         </div>
 
-        <!-- Scrollable content area (window frame is fixed, this scrolls) -->
-        <div class="window-body" style="flex:1;overflow-y:auto;overflow-x:hidden;padding:0;">
-
+        <!-- Era filter + toolbar pinned above the scroll area -->
         <!-- Era filter (applies to all tabs) -->
-        <div style="padding:10px 12px;background:var(--win-surface);border-bottom:1px solid #a0a0a0;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <div style="padding:4px 12px;background:var(--win-surface);border-bottom:1px solid #a0a0a0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <label style="font-size:10px;font-weight:bold;text-transform:uppercase;color:#404040;">Era Filter:</label>
             <div class="era-tabs" style="display:flex;gap:2px;">
                 <button class="era-btn active" data-era="all"   style="height:24px;padding:0 10px;background:#dfdfdf;box-shadow:var(--bevel-sunken);border:none;cursor:pointer;font-family:inherit;font-size:11px;font-weight:bold;">All Eras</button>
@@ -580,6 +578,9 @@
             </div>
         </div>
 
+        <!-- Scrollable content: table + chart (era filter + tabs stay pinned above) -->
+        <div class="window-content">
+
         <!-- Table -->
         <div class="window-body-flush">
             <div class="win-table-wrap">
@@ -610,7 +611,7 @@
             </div>
         </div>
 
-        </div><!-- /scrollable content area -->
+        </div><!-- /window-content (scrollable) -->
 
         <!-- Status bar (pinned to bottom of window) -->
         <div class="statusbar">
