@@ -301,6 +301,22 @@
         @media (max-width: 768px) {
             .desktop { padding: 0; }
 
+            /* Rank column smaller */
+            table.win-table thead th:nth-child(1),
+            table.win-table tbody td:nth-child(1) {
+                padding: 2px 2px;
+                font-size: 9px;
+                width: 20px;
+                text-align: center;
+            }
+            table.win-table tbody td:nth-child(1) .rank-badge,
+            table.win-table tbody td:nth-child(1) span {
+                width: 18px;
+                height: 16px;
+                font-size: 9px;
+                min-width: 0;
+            }
+
             /* Hide era filter on mobile — too many buttons */
             .era-filter-row { display: none !important; }
 
@@ -376,7 +392,9 @@
             }
 
             /* Hide less important columns on mobile per tab:
-               ATH DATE (7th), SAT IDX (9th), NF 7D (10th), NF 30D (11th) */
+               ATH (6th), ATH DATE (7th), SAT IDX (9th), NF 7D (10th), NF 30D (11th) */
+            table.win-table thead th:nth-child(6),
+            table.win-table tbody td:nth-child(6) { display: none; }
             table.win-table thead th:nth-child(7),
             table.win-table tbody td:nth-child(7) { display: none; }
             table.win-table thead th:nth-child(9),
