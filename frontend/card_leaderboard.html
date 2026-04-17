@@ -258,30 +258,31 @@
         .anchor-badge.anchor-90d { background: #c8e8ff; color: #003060; border-color: #4080c0; }
         .anchor-badge.anchor-30d { background: #f8e8c8; color: #604000; border-color: #c08040; font-style: italic; }
 
-        /* Distribution chart (below the table) */
+        /* Distribution chart (below the table) — pushed to bottom of content */
         .dist-chart-box {
             border-top: 2px groove var(--win-surface);
             background: #f3f3f3;
-            padding: 10px 14px 14px;
+            padding: 6px 14px 8px;
+            margin-top: auto;
         }
         .dist-chart-title {
-            font-size: 11px;
+            font-size: 10px;
             font-weight: bold;
             text-transform: uppercase;
             color: #404040;
-            margin-bottom: 6px;
+            margin-bottom: 2px;
         }
         .dist-chart-sub {
-            font-size: 10px;
+            font-size: 9px;
             color: #707070;
-            margin-bottom: 8px;
+            margin-bottom: 4px;
         }
         .dist-chart-wrap {
             position: relative;
-            height: 180px;
+            height: 150px;
             box-shadow: var(--bevel-sunken);
             background: var(--win-white);
-            padding: 4px;
+            padding: 2px;
         }
         .dist-chart-wrap canvas { width: 100% !important; height: 100% !important; }
         .opp-philosophy {
@@ -453,7 +454,7 @@
         </div>
 
         <!-- Scrollable content area (window frame is fixed, this scrolls) -->
-        <div class="window-body" style="flex:1;overflow-y:auto;overflow-x:hidden;padding:0;">
+        <div class="window-body" style="flex:1;overflow-y:auto;overflow-x:hidden;padding:0;display:flex;flex-direction:column;">
 
         <!-- Era filter (applies to all tabs) -->
         <div style="padding:10px 12px;background:var(--win-surface);border-bottom:1px solid #a0a0a0;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
