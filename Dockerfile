@@ -29,15 +29,14 @@ RUN mkdir -p /app/data
 
 # Cron schedule — scrapers run on the server, not localhost.
 # Times are UTC. Adjust if needed.
-RUN echo "# eBay async collection (signal universe + dip candidates)\n\
+RUN echo "# 00:15 UTC (5:15 PM PDT) — eBay + prices after rate limit resets\n\
+15 0 * * * cd /app && /usr/local/bin/python -m scripts.populate_ebay_signal_universe >> /data/logs/cron_ebay.log 2>&1 && /usr/local/bin/python -m scripts.populate_ebay_dip_candidates >> /data/logs/cron_ebay.log 2>&1 && /usr/local/bin/python -m pipeline.daily_pipeline >> /data/logs/cron_daily.log 2>&1\n\
+# 10:00 UTC (3 AM PDT) — second eBay + prices run\n\
 0 10 * * * cd /app && /usr/local/bin/python -m scripts.populate_ebay_signal_universe >> /data/logs/cron_ebay.log 2>&1\n\
-30 10 * * * cd /app && /usr/local/bin/python -m scripts.populate_ebay_dip_candidates >> /data/logs/cron_ebay_dip.log 2>&1\n\
-# Daily pipeline (prices + signals + model)\n\
+30 10 * * * cd /app && /usr/local/bin/python -m scripts.populate_ebay_dip_candidates >> /data/logs/cron_ebay.log 2>&1\n\
 0 11 * * * cd /app && /usr/local/bin/python -m pipeline.daily_pipeline >> /data/logs/cron_daily.log 2>&1\n\
-# Weekly pipeline\n\
-0 9 * * 0 cd /app && /usr/local/bin/python -m pipeline.daily_pipeline --stage compute >> /data/logs/cron_weekly.log 2>&1\n\
-# One-time catch-up at 00:15 UTC (5:15 PM PDT) — runs once then removes itself\n\
-15 0 * * * cd /app && /usr/local/bin/python -m scripts.populate_ebay_signal_universe >> /data/logs/cron_ebay_catchup.log 2>&1 && /usr/local/bin/python -m scripts.populate_ebay_dip_candidates >> /data/logs/cron_ebay_catchup.log 2>&1\n" \
+# Weekly recompute\n\
+0 9 * * 0 cd /app && /usr/local/bin/python -m pipeline.daily_pipeline --stage compute >> /data/logs/cron_weekly.log 2>&1\n" \
     > /etc/cron.d/pokedelta \
     && chmod 0644 /etc/cron.d/pokedelta \
     && crontab /etc/cron.d/pokedelta
