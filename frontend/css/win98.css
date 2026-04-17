@@ -96,6 +96,7 @@ body {
     display: flex;
     flex-direction: column;
     margin-bottom: 8px;
+    min-height: 80vh;
 }
 
 .window-title {
