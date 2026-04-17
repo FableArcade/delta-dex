@@ -182,8 +182,6 @@ body {
 
 .window-body {
     padding: 8px;
-    flex: 1;
-    min-height: 0;
 }
 
 .window-body-flush {
@@ -493,9 +491,7 @@ table.win-table tbody tr:hover .chip-neu {
 .grid-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: 1fr 1fr;
     gap: 8px;
-    height: 100%;
 }
 
 @media (max-width: 900px) {
