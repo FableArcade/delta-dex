@@ -288,19 +288,17 @@ body {
 }
 
 .back-btn {
-    padding: 2px 8px;
-    cursor: pointer;
-    font-size: 12px;
-    font-family: inherit;
-    background: none;
+    height: 20px;
+    padding: 0 10px;
+    background: var(--win-surface);
+    box-shadow: var(--bevel-raised);
     border: none;
-    text-decoration: none;
-    color: var(--win-text);
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: bold;
+    font-size: 11px;
 }
-.back-btn:hover {
-    background: var(--win-highlight);
-    color: var(--win-highlight-text);
-}
+.back-btn:active { box-shadow: var(--bevel-sunken); }
 
 .start-btn {
     height: 24px;
