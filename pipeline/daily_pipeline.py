@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import importlib
+import json
 import logging
 import sys
 import time
@@ -26,6 +27,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from db.connection import get_db
+from pipeline.alerting import alert as emit_alert
 
 # ------------------------------------------------------------------
 # Logging setup
@@ -141,8 +143,11 @@ class DailyPipeline:
         self.dry_run: bool = dry_run
         self.run_id: Optional[int] = None
         self.errors: List[str] = []
+        self.stage_failures: List[str] = []  # stages that hit an exception
         self.stage_timings: Dict[str, float] = {}
         self.cards_processed: int = 0
+        # Per-source scrape completion: {"pricecharting": {"expected":N, "processed":M, "pct":X}, ...}
+        self.scraper_completion: Dict[str, Dict[str, Any]] = {}
 
     # -------------------- run bookkeeping --------------------
 
@@ -178,28 +183,52 @@ class DailyPipeline:
 
     def _finish_run(self, status: str, notes_suffix: str = "") -> None:
         summary = self._build_summary(notes_suffix)
+        completion_json = json.dumps(self.scraper_completion) if self.scraper_completion else None
         if self.dry_run or self.run_id in (None, -1):
-            logger.info("[DRY RUN] would finish pipeline_runs: status=%s notes=%s",
-                        status, summary)
+            logger.info("[DRY RUN] would finish pipeline_runs: status=%s notes=%s completion=%s",
+                        status, summary, completion_json)
             return
+        # Use scraper_completion_json column if it exists (see scripts/migrate_ops_columns.py).
         with get_db() as db:
-            db.execute(
-                """UPDATE pipeline_runs
-                      SET finished_at = ?,
-                          status = ?,
-                          cards_processed = ?,
-                          errors = ?,
-                          notes = ?
-                    WHERE id = ?""",
-                (
-                    dt.datetime.utcnow().isoformat(timespec="seconds"),
-                    status,
-                    self.cards_processed,
-                    len(self.errors),
-                    summary,
-                    self.run_id,
-                ),
-            )
+            cols = {r["name"] for r in db.execute("PRAGMA table_info(pipeline_runs)").fetchall()}
+            if "scraper_completion_json" in cols:
+                db.execute(
+                    """UPDATE pipeline_runs
+                          SET finished_at = ?,
+                              status = ?,
+                              cards_processed = ?,
+                              errors = ?,
+                              notes = ?,
+                              scraper_completion_json = ?
+                        WHERE id = ?""",
+                    (
+                        dt.datetime.utcnow().isoformat(timespec="seconds"),
+                        status,
+                        self.cards_processed,
+                        len(self.errors),
+                        summary,
+                        completion_json,
+                        self.run_id,
+                    ),
+                )
+            else:
+                db.execute(
+                    """UPDATE pipeline_runs
+                          SET finished_at = ?,
+                              status = ?,
+                              cards_processed = ?,
+                              errors = ?,
+                              notes = ?
+                        WHERE id = ?""",
+                    (
+                        dt.datetime.utcnow().isoformat(timespec="seconds"),
+                        status,
+                        self.cards_processed,
+                        len(self.errors),
+                        summary,
+                        self.run_id,
+                    ),
+                )
         logger.info("pipeline_runs updated: id=%s status=%s", self.run_id, status)
 
     def _build_summary(self, suffix: str = "") -> str:
@@ -217,7 +246,10 @@ class DailyPipeline:
     def _run_stage(self, name: str, func: Callable[[], Any]) -> bool:
         """Run a single stage callable. Returns True on success, False on failure.
 
-        Records timing and never re-raises; errors are appended to self.errors.
+        Records timing and captures full traceback on failure. Individual stage
+        failures do NOT re-raise (so later stages can still run), but they ARE
+        tracked in self.stage_failures — if any are present at the end of the
+        run, the overall run is marked FAILED (not DONE).
         """
         self._update_stage(name)
         print(f"\n>>> STAGE: {name}")
@@ -231,36 +263,63 @@ class DailyPipeline:
         except Exception as exc:  # noqa: BLE001  -- resilience
             elapsed = time.time() - start
             self.stage_timings[name] = elapsed
-            msg = f"{name}: {exc}"
+            tb = traceback.format_exc()
+            msg = f"{name}: {exc.__class__.__name__}: {exc}"
             self.errors.append(msg)
+            self.stage_failures.append(name)
             logger.error("Stage %s failed: %s", name, exc)
-            logger.debug("Traceback:\n%s", traceback.format_exc())
+            logger.error("Traceback:\n%s", tb)
             print(f"    FAIL {name} ({elapsed:.1f}s): {exc}")
+            try:
+                emit_alert(
+                    severity="error",
+                    source="daily_pipeline",
+                    message=f"Stage {name} failed: {exc.__class__.__name__}: {exc}",
+                    context={
+                        "run_id": self.run_id,
+                        "date": self.date,
+                        "stage": name,
+                        "traceback": tb,
+                    },
+                )
+            except Exception:  # noqa: BLE001 -- alerting must never break pipeline
+                logger.exception("alerting failed (non-fatal)")
             return False
 
     # -------------------- scrapers --------------------
 
     def _run_scraper(self, spec: Dict[str, Any]) -> None:
-        if spec["name"] in self.skip:
-            logger.info("Skipping scraper %s (explicit --skip)", spec["name"])
+        name = spec["name"]
+        if name in self.skip:
+            logger.info("Skipping scraper %s (explicit --skip)", name)
+            self.scraper_completion[name] = {
+                "expected": None, "processed": 0, "pct": None, "status": "skipped",
+            }
             return
 
         if self.dry_run:
             logger.info("[DRY RUN] would run scraper %s (~%d min)",
-                        spec["name"], spec["est_minutes"])
+                        name, spec["est_minutes"])
             return
 
         cls = _try_import_scraper(spec)
         if cls is None:
-            # Already logged a warning; record as soft error but continue.
-            self.errors.append(f"{spec['name']}: module unavailable")
+            # Module unavailable — record as a real error so the run fails loudly.
+            self.errors.append(f"{name}: module unavailable")
+            self.stage_failures.append(f"scrape:{name}")
+            self.scraper_completion[name] = {
+                "expected": None, "processed": 0, "pct": 0.0, "status": "module_missing",
+            }
+            emit_alert(
+                severity="error",
+                source="daily_pipeline",
+                message=f"Scraper module unavailable: {name}",
+                context={"run_id": self.run_id, "date": self.date, "scraper": name},
+            )
             return
 
-        logger.info("Running scraper: %s", spec["name"])
-        try:
-            instance = cls()
-        except Exception:
-            raise
+        logger.info("Running scraper: %s", name)
+        instance = cls()
 
         # Try common entry points in priority order.
         # `scrape_all_cards` is the convention used by PriceCharting / 130point
@@ -270,32 +329,73 @@ class DailyPipeline:
             method = getattr(instance, method_name, None)
             if callable(method):
                 result = method(self.date) if _accepts_arg(method) else method()
-                self._accumulate_result(result)
+                self._accumulate_result(name, result)
                 return
         raise RuntimeError(
-            f"Scraper {spec['name']} has no run/scrape/collect/execute method"
+            f"Scraper {name} has no run/scrape/collect/execute method"
         )
 
-    def _accumulate_result(self, result: Any) -> None:
-        """If a scraper returns a dict with 'processed', add it to totals."""
+    def _accumulate_result(self, source: str, result: Any) -> None:
+        """Record per-source completion stats + accumulate totals.
+
+        Scrapers are encouraged to return a dict like:
+            {"processed": 915, "expected": 8535}
+        If only 'processed' is present, we record that (pct=None).
+        """
+        processed = 0
+        expected: Optional[int] = None
         if isinstance(result, dict):
-            self.cards_processed += int(result.get("processed", 0) or 0)
+            processed = int(result.get("processed", 0) or 0)
+            exp_val = result.get("expected")
+            if exp_val is not None:
+                try:
+                    expected = int(exp_val)
+                except (TypeError, ValueError):
+                    expected = None
+
+        self.cards_processed += processed
+        pct: Optional[float] = None
+        if expected and expected > 0:
+            pct = round(100.0 * processed / expected, 2)
+
+        self.scraper_completion[source] = {
+            "expected": expected,
+            "processed": processed,
+            "pct": pct,
+            "status": "ok",
+        }
+
+        # Alert when completion is visibly broken (matches "915/8535" symptom).
+        if pct is not None and pct < 50.0:
+            emit_alert(
+                severity="warn",
+                source="daily_pipeline",
+                message=f"Scraper {source} low completion: {processed}/{expected} ({pct}%)",
+                context={"run_id": self.run_id, "date": self.date, "scraper": source},
+            )
 
     def _stage_scrape(self) -> None:
-        """Stage 1-3: run scrapers in order."""
-        # Stage 1: PriceCharting (primary prices) - ~5 hours
-        self._run_stage("scrape:pricecharting",
-                        lambda: self._run_scraper(SCRAPER_SPECS[0]))
+        """Stage 1-3: run scrapers concurrently across independent domains.
 
-        # Stage 2: 130point (eBay sold) - ~25 min
-        self._run_stage("scrape:onethirty_point",
-                        lambda: self._run_scraper(SCRAPER_SPECS[1]))
+        Each scraper hits a different host (pricecharting / 130point / tcgplayer),
+        so per-domain rate limits are unaffected. WAL-mode SQLite + fresh
+        connections per get_db() call handle concurrent writers.
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
 
-        # Stage 3: TCGPlayer (NM prices) - async/background capable,
-        # but run inline here; the actual scraper may fire off an async
-        # worker internally.
-        self._run_stage("scrape:tcgplayer",
-                        lambda: self._run_scraper(SCRAPER_SPECS[2]))
+        jobs = [
+            ("scrape:pricecharting", SCRAPER_SPECS[0]),
+            ("scrape:onethirty_point", SCRAPER_SPECS[1]),
+            ("scrape:tcgplayer", SCRAPER_SPECS[2]),
+        ]
+
+        with ThreadPoolExecutor(max_workers=len(jobs), thread_name_prefix="scrape") as pool:
+            futures = {
+                pool.submit(self._run_stage, stage_name, lambda s=spec: self._run_scraper(s)): stage_name
+                for stage_name, spec in jobs
+            }
+            for fut in as_completed(futures):
+                fut.result()
 
     # -------------------- transformers --------------------
 
@@ -390,6 +490,21 @@ class DailyPipeline:
 
         self._run_stage("predict:projections", _run_predict)
 
+        # After projections land, lock them into paper_trades (with cohort
+        # tags) and evaluate any trades that have reached T+90.
+        def _run_paper_trade():
+            try:
+                from pipeline.model import paper_trade
+            except ImportError as exc:
+                logger.warning("paper_trade module not available: %s", exc)
+                self.errors.append(f"paper_trade: module unavailable ({exc})")
+                return
+            with get_db() as db:
+                result = paper_trade.run_daily(db)
+                logger.info("paper_trade: %s", result)
+
+        self._run_stage("predict:paper_trade", _run_paper_trade)
+
     # -------------------- main run --------------------
 
     def run(self) -> int:
@@ -423,11 +538,34 @@ class DailyPipeline:
 
             total_secs = time.time() - run_start
             print(f"\n=== Pipeline finished in {total_secs:.1f}s ===")
-            print(f"    errors: {len(self.errors)}")
+            print(f"    errors:         {len(self.errors)}")
+            print(f"    stage failures: {len(self.stage_failures)}")
             for err in self.errors:
                 print(f"    - {err}")
+            if self.scraper_completion:
+                print(f"    scraper completion:")
+                for src, stats in self.scraper_completion.items():
+                    print(f"      - {src}: {stats}")
 
+            # Honest status: any stage failure => FAILED, not "done".
+            if self.stage_failures:
+                self._finish_run("failed", f"failed_stages={','.join(self.stage_failures)}")
+                emit_alert(
+                    severity="error",
+                    source="daily_pipeline",
+                    message=f"Pipeline run {self.run_id} finished FAILED with "
+                            f"{len(self.stage_failures)} failed stage(s)",
+                    context={
+                        "run_id": self.run_id,
+                        "date": self.date,
+                        "failed_stages": self.stage_failures,
+                        "errors": self.errors,
+                        "scraper_completion": self.scraper_completion,
+                    },
+                )
+                return 1
             if self.errors:
+                # Soft errors (warnings captured without stage failure).
                 self._finish_run("done_with_errors")
                 return 1
             self._finish_run("done")
@@ -437,6 +575,16 @@ class DailyPipeline:
             logger.exception("Fatal pipeline error")
             self.errors.append(f"fatal: {exc}")
             self._finish_run("failed", f"fatal={exc}")
+            emit_alert(
+                severity="fatal",
+                source="daily_pipeline",
+                message=f"Fatal pipeline error: {exc.__class__.__name__}: {exc}",
+                context={
+                    "run_id": self.run_id,
+                    "date": self.date,
+                    "traceback": traceback.format_exc(),
+                },
+            )
             return 2
 
 

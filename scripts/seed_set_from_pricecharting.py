@@ -35,7 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from db.connection import init_db, get_db
 
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
-THROTTLE = 2.0  # Seconds between PriceCharting requests
+THROTTLE = 8.0  # Seconds between PriceCharting page requests — PC 403s fast
 
 # ID range: 30000000+ for these bulk-seeded sets (avoids collision with
 # Collectrics 4M-12M range and Crown Zenith 20M range)
@@ -113,16 +113,31 @@ def scrape_set_cards(
     all_cards: Dict[str, Dict[str, Any]] = {}
 
     # Sort by price to get the valuable cards first
-    for page in range(1, max_pages + 1):
+    page = 1
+    while page <= max_pages:
         url = f"https://www.pricecharting.com/console/{set_slug}?sort=price&genre-name=All&page={page}"
         print(f"  Fetching page {page}: {url}")
-        try:
-            resp = client.get(url)
-            if resp.status_code != 200:
+        resp = None
+        backoff = 30.0
+        for attempt in range(1, 5):
+            try:
+                resp = client.get(url)
+                if resp.status_code == 200:
+                    break
+                if resp.status_code in (403, 429):
+                    print(f"  HTTP {resp.status_code} — rate-limited, sleep {backoff:.0f}s (attempt {attempt}/4)")
+                    time.sleep(backoff)
+                    backoff *= 2
+                    continue
                 print(f"  HTTP {resp.status_code}, stopping pagination")
+                resp = None
                 break
-        except Exception as e:
-            print(f"  Fetch failed: {e}")
+            except Exception as e:
+                print(f"  Fetch failed: {e}; sleep {backoff:.0f}s")
+                time.sleep(backoff)
+                backoff *= 2
+        if resp is None or resp.status_code != 200:
+            print(f"  Giving up on page {page}")
             break
 
         soup = BeautifulSoup(resp.text, "html.parser")
@@ -132,9 +147,7 @@ def scrape_set_cards(
             text = _clean_card_name(a.get_text())
             if not text:
                 continue
-            # Extract slug (last part of URL)
             slug = urllib.parse.unquote(href.rstrip("/").split("/")[-1])
-            # Skip reverse holos unless it's the only version (usually duplicate of base)
             if "reverse-holo" in slug or "[Reverse Holo]" in text:
                 continue
             if slug in all_cards:
@@ -148,11 +161,16 @@ def scrape_set_cards(
         print(f"  Page {page}: {count} new cards (total: {len(all_cards)})")
         if count == 0:
             break
+        page += 1
         time.sleep(THROTTLE)
 
     # PriceCharting sorts by price desc by default, so first N should be top value
-    result = list(all_cards.values())[:top_n]
-    print(f"  Selected top {len(result)} cards")
+    # top_n=0 means "no limit — return everything".
+    if top_n and top_n > 0:
+        result = list(all_cards.values())[:top_n]
+    else:
+        result = list(all_cards.values())
+    print(f"  Selected {len(result)} cards")
     return result
 
 
@@ -192,13 +210,59 @@ def seed_set(
             (set_code, set_name, release_date, psa_pop_url),
         )
 
+        # Dedupe against already-seeded canonical URLs so re-runs are safe.
+        existing_urls = {
+            row[0] for row in db.execute(
+                "SELECT pc_canonical_url FROM cards "
+                "WHERE set_code = ? AND pc_canonical_url IS NOT NULL",
+                (set_code,),
+            ).fetchall() if row[0]
+        }
+        # Next-available ID starting from (ID_BASE + id_offset), skipping any
+        # IDs already used in that range so concurrent or repeated runs never
+        # clobber existing rows.
+        used_ids = {
+            int(row[0]) for row in db.execute(
+                "SELECT id FROM cards WHERE CAST(id AS INTEGER) >= ? "
+                "AND CAST(id AS INTEGER) < ?",
+                (ID_BASE + id_offset, ID_BASE + id_offset + 100_000),
+            ).fetchall() if row[0] and str(row[0]).isdigit()
+        }
+
+        next_id = ID_BASE + id_offset
+
+        def _alloc_id() -> str:
+            nonlocal next_id
+            while next_id in used_ids:
+                next_id += 1
+            chosen = next_id
+            used_ids.add(chosen)
+            next_id += 1
+            return str(chosen)
+
+        # Filter out cards we've already seeded.
+        new_cards = []
+        for card in cards:
+            canonical = f"{pc_base}/{card['slug']}"
+            if canonical in existing_urls:
+                continue
+            new_cards.append(card)
+        skipped = len(cards) - len(new_cards)
+        if skipped:
+            print(f"  Skipping {skipped} already-seeded cards")
+        cards = new_cards
+
+        if not cards:
+            print("  Nothing new to insert")
+            return 0
+
         # Derive a rough set_count from cards scraped (not exact but usable)
         set_count = len(cards)
 
         # Insert cards
         rarities_seen: Dict[str, Dict[str, Any]] = {}
         for i, card in enumerate(cards):
-            card_id = str(ID_BASE + id_offset + i)
+            card_id = _alloc_id()
             rarity_code, rarity_name = _slug_to_rarity(card["name"])
 
             # Track rarities for the rarities table

@@ -16,17 +16,41 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
+from pipeline.model.friction import net_realized_return
+from pipeline.model.liquidity import (
+    LIQUIDITY_COLUMNS,
+    compute_liquidity_at_date,
+    compute_live_liquidity,
+)
+from pipeline.model.reprint_risk import (
+    REPRINT_COLUMNS,
+    build_reprint_index,
+    load_release_calendar,
+    reprint_features_at_date,
+)
+from pipeline.model.catalyst import (
+    CATALYST_COLUMNS,
+    catalyst_features_at_date,
+    load_set_release_calendar,
+)
+from pipeline.model.tournament_signal import (
+    TOURNAMENT_COLUMNS,
+    tournament_features_at_date,
+    load_tournament_data,
+)
+
 logger = logging.getLogger("pipeline.model.features")
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-MIN_PSA10_PRICE = 20.0
+MIN_PSA10_PRICE = 10.0
 MIN_TRAILING_DAYS = 90
-MIN_FORWARD_DAYS = 90
-HORIZON_DAYS = 90
-OUTLIER_TRIM_PCT = 0.01  # trim top/bottom 1% of targets
+MIN_FORWARD_DAYS = 180
+HORIZON_DAYS = 180
+OUTLIER_TRIM_PCT = 0.02  # trim top/bottom 2% of targets
+TARGET_COL = f"target_return_{HORIZON_DAYS}d"
 
 # Cultural impact scoring (ported from card_leaderboard.js)
 ICONIC_NAMES: Dict[str, float] = {
@@ -208,6 +232,44 @@ def build_training_dataset(db: sqlite3.Connection) -> pd.DataFrame:
         db,
     )
 
+    # v1.2: Load full eBay history for liquidity features
+    ebay_df = pd.read_sql_query(
+        "SELECT card_id, date, ended, new, active_from "
+        "FROM ebay_history WHERE card_id IN ({}) ORDER BY card_id, date".format(
+            ",".join("?" for _ in card_ids)
+        ),
+        db,
+        params=card_ids,
+    )
+    ebay_df["date"] = pd.to_datetime(ebay_df["date"])
+
+    # v1.2: Build reprint calendar once for all cards
+    logger.info("Loading reprint calendar...")
+    release_df = load_release_calendar(db)
+    reprint_idx = build_reprint_index(release_df)
+    card_set_codes = dict(
+        db.execute(
+            "SELECT id, set_code FROM cards WHERE sealed_product = 'N'"
+        ).fetchall()
+    )
+    logger.info("Indexed %d Pokemon release timelines", len(reprint_idx))
+
+    # v2.1: Set-release catalyst index (same data, different lookup)
+    set_dates, all_release_dates_sorted = load_set_release_calendar(db)
+    logger.info("Catalyst index: %d sets with release dates", len(set_dates))
+
+    # v2.2: Tournament data (Signal Class 3)
+    tournament_df = load_tournament_data(db)
+    card_setnum = dict(
+        db.execute(
+            "SELECT id, set_code || '|' || card_number FROM cards "
+            "WHERE sealed_product = 'N' AND set_code IS NOT NULL "
+            "AND card_number IS NOT NULL"
+        ).fetchall()
+    )
+    logger.info("Tournament data: %d appearance rows, %d card keys",
+                len(tournament_df), len(card_setnum))
+
     samples = []
     for card_id in card_ids:
         card_prices = price_df[price_df["card_id"] == card_id].copy()
@@ -249,7 +311,9 @@ def build_training_dataset(db: sqlite3.Connection) -> pd.DataFrame:
             if anchor_price <= 0 or forward_price <= 0:
                 continue
 
-            target = (forward_price - anchor_price) / anchor_price
+            # v1.2: Net-of-cost target. Gross price gain minus eBay fees
+            # and shipping — the return an investor actually realizes.
+            target = net_realized_return(anchor_price, forward_price)
 
             # Compute features at anchor date
             trailing = valid[valid.index <= anchor_date]
@@ -263,6 +327,35 @@ def build_training_dataset(db: sqlite3.Connection) -> pd.DataFrame:
             )
             if features is None:
                 continue
+
+            # v1.2: Liquidity features from trailing eBay window
+            card_ebay = ebay_df[ebay_df["card_id"] == card_id].set_index("date")
+            features.update(compute_liquidity_at_date(card_ebay, anchor_date))
+
+            # v1.2: Reprint-risk features
+            features.update(reprint_features_at_date(
+                pokemon_name,
+                card_set_codes.get(card_id, ""),
+                anchor_date,
+                reprint_idx,
+            ))
+
+            # v2.1: Set-release catalyst features
+            features.update(catalyst_features_at_date(
+                card_set_codes.get(card_id, ""),
+                anchor_date,
+                set_dates,
+                all_release_dates_sorted,
+            ))
+
+            # v2.2: Tournament competitive-demand features
+            sn = card_setnum.get(card_id, "|").split("|", 1)
+            features.update(tournament_features_at_date(
+                sn[0] if len(sn) == 2 else "",
+                sn[1] if len(sn) == 2 else "",
+                anchor_date,
+                tournament_df,
+            ))
 
             # Add new cultural features
             features["cultural_tier"] = float(cult_tier)
@@ -280,7 +373,7 @@ def build_training_dataset(db: sqlite3.Connection) -> pd.DataFrame:
 
             features["card_id"] = card_id
             features["anchor_date"] = anchor_date.isoformat()[:10]
-            features["target_return_90d"] = target
+            features[TARGET_COL] = target
             samples.append(features)
 
     df = pd.DataFrame(samples)
@@ -290,9 +383,9 @@ def build_training_dataset(db: sqlite3.Connection) -> pd.DataFrame:
         return df
 
     # Trim outliers on target
-    lo = df["target_return_90d"].quantile(OUTLIER_TRIM_PCT)
-    hi = df["target_return_90d"].quantile(1 - OUTLIER_TRIM_PCT)
-    df = df[(df["target_return_90d"] >= lo) & (df["target_return_90d"] <= hi)]
+    lo = df[TARGET_COL].quantile(OUTLIER_TRIM_PCT)
+    hi = df[TARGET_COL].quantile(1 - OUTLIER_TRIM_PCT)
+    df = df[(df[TARGET_COL] >= lo) & (df[TARGET_COL] <= hi)]
     logger.info("After outlier trim: %d samples", len(df))
 
     return df
@@ -391,9 +484,39 @@ FEATURE_COLUMNS = [
     "volatility", "ma_distance", "log_price", "net_flow_pct_7d",
     "net_flow_pct_30d", "demand_pressure_7d", "demand_pressure_30d",
     "supply_saturation_index", "ds_ratio", "gem_pct", "psa_10_pop",
-    "psa_10_vs_raw_pct", "cultural_score", "rarity_tier", "history_days",
+    # `psa_10_vs_raw_pct` PERMANENTLY REMOVED (2026-04-16):
+    # Ratio of two loosely-coupled markets (PSA 10 vs. raw) with hidden
+    # condition variance on the raw side + temporal misalignment between
+    # numerator and denominator. Ablation (scripts/ablate_collider.py)
+    # showed removal gave +18% relative Sharpe on top-2% conviction.
+    # Signal it tried to capture is already cleanly present via gem_pct,
+    # psa_10_pop, and log_price. See docs/MODEL_DAG.md.
+    "cultural_score", "rarity_tier", "history_days",
     # v1.1: Cultural ceiling features
     "cultural_tier", "pokemon_peak_log", "pokemon_peak_ratio",
+    # v1.2: Liquidity features REMOVED (2026-04-16) —
+    # sales_per_day_30d, sell_through_30d, ask_bid_proxy_30d,
+    # new_listings_per_day_30d, thin_market_flag all have ZERO variance
+    # across the training dataset (all rows identical values). The
+    # underlying ebay_history table isn't populated at feature-compute
+    # time. Five dead features wasting model capacity. Re-introduce
+    # only after the ebay_history pipeline is fixed — see MODEL_DAG.md.
+    # *LIQUIDITY_COLUMNS,
+    # v1.2: Reprint risk — supply-side existential risk for singles
+    *REPRINT_COLUMNS,
+    # v2.1 CATALYST features HELD BACK (2026-04-16). Trained a v2.1 model
+    # with 28 features (catalyst added) and validated +0.62 Sharpe lift,
+    # but top-1%/top-2% hit rates regressed -2.5pp and -1.0pp. User's
+    # priority is hit-rate-first (psychologically-consistent investing)
+    # over Sharpe-first (position-sizing), so reverted to v2.0 25-feature
+    # set. Catalyst features remain COMPUTED (so DataFrame has them) but
+    # NOT in FEATURE_COLUMNS — toggle back by re-enabling the line below.
+    # *CATALYST_COLUMNS,
+    # v2.2 TOURNAMENT features HELD BACK (2026-04-16). Temporal mismatch
+    # between 180-day tournament coverage and training-anchor range
+    # ending 2025-10-01 = zero training variance. Collected and present
+    # in live features for UI surfacing only.
+    # *TOURNAMENT_COLUMNS,
 ]
 
 
@@ -564,7 +687,83 @@ def build_live_features(db: sqlite3.Connection) -> pd.DataFrame:
     df = pd.DataFrame(features_list)
     if not df.empty:
         df = df.set_index("card_id")
-    logger.info("Built live features for %d cards", len(df))
+
+    # v1.2: Enrich with liquidity features from ebay_history
+    liq = compute_live_liquidity(db)
+    if not liq.empty:
+        df = df.join(liq, how="left")
+    for col in LIQUIDITY_COLUMNS:
+        if col not in df.columns:
+            df[col] = 0.0
+        # thin_market defaults to 1 (pessimistic assumption: no data = illiquid);
+        # all other liquidity features default to 0 (no activity).
+        default = 1.0 if col == "thin_market_flag" else 0.0
+        df[col] = df[col].fillna(default)
+
+    # v1.2: Enrich with reprint-risk features (live = today as anchor)
+    release_df = load_release_calendar(db)
+    reprint_idx = build_reprint_index(release_df)
+    card_rows = db.execute(
+        "SELECT id, product_name, set_code, card_number FROM cards WHERE sealed_product = 'N'"
+    ).fetchall()
+    anchor = pd.Timestamp.now().normalize()
+    reprint_recs = []
+    for r in card_rows:
+        pokemon = extract_pokemon_name(r["product_name"])
+        reprint_recs.append({
+            "card_id": r["id"],
+            **reprint_features_at_date(pokemon, r["set_code"], anchor, reprint_idx),
+        })
+    rep_df = pd.DataFrame(reprint_recs).set_index("card_id")
+    df = df.join(rep_df, how="left")
+    for col in REPRINT_COLUMNS:
+        if col not in df.columns:
+            df[col] = 0.0
+        df[col] = df[col].fillna(0.0)
+
+    # v2.1: Enrich with catalyst features (set-release recency)
+    set_dates, all_release_dates_sorted = load_set_release_calendar(db)
+    catalyst_recs = []
+    for r in card_rows:
+        catalyst_recs.append({
+            "card_id": r["id"],
+            **catalyst_features_at_date(
+                r["set_code"], anchor, set_dates, all_release_dates_sorted,
+            ),
+        })
+    cat_df = pd.DataFrame(catalyst_recs).set_index("card_id")
+    df = df.join(cat_df, how="left")
+    for col in CATALYST_COLUMNS:
+        if col not in df.columns:
+            df[col] = 9999.0 if "days" in col else 0.0
+        default = 9999.0 if "days" in col else 0.0
+        df[col] = df[col].fillna(default)
+
+    # v2.2: Tournament signal features for live cards
+    tournament_df = load_tournament_data(db)
+    tour_recs = []
+    for r in card_rows:
+        cnum = r["card_number"]
+        tour_recs.append({
+            "card_id": r["id"],
+            **tournament_features_at_date(
+                r["set_code"] or "",
+                str(cnum) if cnum is not None else "",
+                anchor,
+                tournament_df,
+            ),
+        })
+    tour_df = pd.DataFrame(tour_recs).set_index("card_id")
+    df = df.join(tour_df, how="left")
+    for col in TOURNAMENT_COLUMNS:
+        if col not in df.columns:
+            df[col] = 0.0
+        df[col] = df[col].fillna(0.0)
+
+    logger.info(
+        "Built live features for %d cards (v2.2: +%d catalyst +%d tournament)",
+        len(df), len(CATALYST_COLUMNS), len(TOURNAMENT_COLUMNS),
+    )
     return df
 
 

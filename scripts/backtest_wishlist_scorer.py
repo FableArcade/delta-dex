@@ -57,10 +57,10 @@ DB_PATH = Path(__file__).resolve().parent.parent / "data" / "pokemon.db"
 MIN_MONTHS_PER_CARD = 9
 
 # Horizon for forward returns (in days).
-FORWARD_HORIZON_DAYS = 90
+FORWARD_HORIZON_DAYS = 180
 
 # Monetary floor — below this we don't care about the card as an investment.
-MIN_PSA10_PRICE = 20
+MIN_PSA10_PRICE = 10
 
 
 # ---------------------------------------------------------------------------

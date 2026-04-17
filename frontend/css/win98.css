@@ -109,9 +109,16 @@ body {
     overflow: hidden;
 }
 
-/* The window body area scrolls; the window frame does not */
-.window > .window-body,
-.window > .window-body-flush {
+/* The window-content wrapper scrolls; the window frame does not.
+   Title bar, menubar, and statusbar stay pinned outside this. */
+.window-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Fallback: if no .window-content wrapper, the first .window-body scrolls */
+.window > .window-body:first-of-type {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;

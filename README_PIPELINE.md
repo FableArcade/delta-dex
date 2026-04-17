@@ -42,7 +42,7 @@ All stage transitions are recorded in the `pipeline_runs` table.
 
 ## How to run it manually
 
-From the project root (`/Users/yoson/pokemon-analytics`):
+From the project root (wherever you cloned this repo — the scripts resolve their own location, no hardcoded paths):
 
 ```bash
 # Full daily run for today
@@ -93,18 +93,19 @@ The wrapper activates `.venv/` if present, tees stdout/stderr to a timestamped l
 ## How to install cron
 
 ```bash
-./scripts/install_cron.sh
+./scripts/install_cron.sh            # install
+./scripts/install_cron.sh --dry-run  # preview the entries that would be installed
 ```
 
-This installs two entries (idempotent -- safe to re-run):
+Idempotent — safe to re-run. The script resolves the project dir from its own location, so there are no hardcoded paths. The installed entries look like:
 
 ```
-0 3 * * * /Users/yoson/pokemon-analytics/scripts/run_pipeline.sh daily  >> data/logs/cron_daily.log  2>&1   # pokemon-analytics:daily
-0 2 * * 0 /Users/yoson/pokemon-analytics/scripts/run_pipeline.sh weekly >> data/logs/cron_weekly.log 2>&1   # pokemon-analytics:weekly
+0 4 * * * <PROJECT>/scripts/run_daily.sh                 >> data/logs/cron_daily.log  2>&1   # pokemon-analytics:daily
+0 2 * * 0 <PROJECT>/scripts/run_pipeline.sh weekly       >> data/logs/cron_weekly.log 2>&1   # pokemon-analytics:weekly
 ```
 
-- Daily  : every day at 03:00 local time
-- Weekly : Sunday at 02:00 local time (runs first, before the daily job)
+- Daily  : every day at 04:00 local time (via `scripts/run_daily.sh`)
+- Weekly : Sunday at 02:00 local time (via `scripts/run_pipeline.sh weekly`)
 
 To inspect:
 
@@ -149,9 +150,40 @@ SELECT id, started_at, finished_at, status, stage, cards_processed, errors, note
 Status values:
 
 - `running`            -- in progress
-- `done`               -- completed cleanly
-- `done_with_errors`   -- completed but some stages reported errors (see `notes`)
-- `failed`             -- fatal error before completion
+- `done`               -- completed cleanly, zero stage failures
+- `done_with_errors`   -- no stage raised an exception but soft warnings exist
+- `failed`             -- one or more stages raised an exception, or a fatal error occurred
+
+`failed` is now the honest default whenever any stage exception is caught. Previously the orchestrator would catch and mark `done` even if a stage silently blew up; that bug is fixed — every stage exception is logged with full traceback, written to `data/logs/alerts.jsonl`, and forces the run into `failed`.
+
+### Per-source scrape completion
+
+Each run also records a JSON blob in `pipeline_runs.scraper_completion_json` with the shape:
+
+```json
+{
+  "pricecharting":     {"expected": 8535, "processed": 915, "pct": 10.72, "status": "ok"},
+  "onethirty_point":   {"expected": 8535, "processed": 8520, "pct": 99.82, "status": "ok"},
+  "tcgplayer":         {"expected": null, "processed": 0,    "pct": null, "status": "skipped"}
+}
+```
+
+Any source with `pct < 50` auto-fires a warn alert. To enable the column, run once:
+
+```bash
+python3 scripts/migrate_ops_columns.py
+```
+
+This is an idempotent `ALTER TABLE ADD COLUMN` — safe to re-run.
+
+### Alerting
+
+Failures are written to `data/logs/alerts.jsonl` (one JSON object per line) and, when `ALERT_WEBHOOK_URL` is set in the environment, POSTed to that URL. There is no hard dependency on any external service.
+
+```bash
+# Quick tail of recent alerts:
+tail -n 20 data/logs/alerts.jsonl | jq .
+```
 
 The `stage` column is updated live as the run progresses through sub-stages (e.g. `scrape:pricecharting`, `transform:composite_price`, `compute:leaderboard`), so you can see where a long-running job is at by polling this table.
 

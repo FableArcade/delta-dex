@@ -549,11 +549,9 @@ function computeMustBuyScore(card) {
     // ---- 1. Cultural impact (0..1) ----
     const cultural = culturalImpactScore(card);
 
-    // Hard gate: without cultural moat, even a strong technical setup is
-    // fragile — there's no demand base to fall back on if sentiment cools.
-    if (cultural < MUSTBUY_MIN_CULTURAL) {
-        card._mbScore = null; card._mbComps = null; return;
-    }
+    // Cultural is a scoring component, not a hard gate. Cards without
+    // iconic names still qualify — they just score lower on the cultural
+    // dimension, which is 15% of the composite.
 
     // ---- 2. Demand momentum (0..1) — NORMALIZED, real-data calibrated ----
     // net_flow_pct is listings absorbed per day as a fraction of the active

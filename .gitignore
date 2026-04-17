@@ -1,7 +1,17 @@
 .env
-data/*.db
 data/*.db-wal
 data/*.db-shm
+data/*.db.bak*
+data/cache/
+data/logs/
+data/tmp/
+data/models/*dataset*.parquet
+data/models/walkforward_*.json
+data/models/realistic_backtest_*.json
 __pycache__/
 *.pyc
 .venv/
+
+# data/pokemon.db is intentionally TRACKED via LFS so HF Spaces deploys
+# work. See .gitattributes. If you'd rather not commit the snapshot,
+# add `data/pokemon.db` back here and use `git add -f` when deploying.

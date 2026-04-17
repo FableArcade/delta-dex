@@ -52,8 +52,8 @@ def _parse_money(text: str) -> Optional[float]:
 
 class PriceChartingScraper(BaseScraper):
     name = "pricecharting"
-    rate_limit = 2.0  # 2s/req
-    rate_limit_jitter = 0.5
+    rate_limit = 1.0  # 1s/req
+    rate_limit_jitter = 0.3
 
     BASE_URL = "https://www.pricecharting.com"
 

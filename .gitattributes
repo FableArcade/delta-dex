@@ -1,0 +1,8 @@
+# HF Spaces (and any normal git host) require files >10MB to flow through
+# Git LFS. The SQLite snapshot + LightGBM model artifacts live here; track
+# them with LFS so `git push hf` succeeds on the first try.
+*.db filter=lfs diff=lfs merge=lfs -text
+*.db-wal filter=lfs diff=lfs merge=lfs -text
+*.db-shm filter=lfs diff=lfs merge=lfs -text
+*.lgb filter=lfs diff=lfs merge=lfs -text
+*.parquet filter=lfs diff=lfs merge=lfs -text

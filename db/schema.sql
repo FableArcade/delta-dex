@@ -290,6 +290,8 @@ CREATE TABLE IF NOT EXISTS model_projections (
     confidence_width REAL,
     feature_contributions TEXT,
     model_version   TEXT,
+    training_cutoff DATE,
+    feature_hash    TEXT,
     PRIMARY KEY (card_id, as_of, horizon_days)
 );
 
@@ -306,7 +308,66 @@ CREATE TABLE IF NOT EXISTS model_report_card (
     hit_rate_positive   REAL,
     calibration_json    TEXT,
     feature_importance_json TEXT,
+    promotion_status    TEXT DEFAULT 'pending',  -- pending | promoted | rejected
+    promotion_reason    TEXT,
     PRIMARY KEY (model_version, as_of, horizon_days)
+);
+
+-- ============================================================
+-- Tier 2: Paper trading + promotion gate + narrow targets
+-- ============================================================
+
+-- Locked-in daily projections that become realized trades at T+90.
+-- Idempotent: (card_id, as_of, horizon_days) primary key means a rerun
+-- overwrites the same row rather than double-counting.
+CREATE TABLE IF NOT EXISTS paper_trades (
+    card_id         TEXT NOT NULL REFERENCES cards(id),
+    as_of           TEXT NOT NULL,              -- entry date (projection date)
+    horizon_days    INTEGER NOT NULL,
+    model_version   TEXT NOT NULL,
+    entry_price     REAL,                       -- PSA 10 price on as_of (or nearest)
+    projected_return REAL,                      -- prediction locked in
+    confidence_low  REAL,
+    confidence_high REAL,
+    exit_date       TEXT,                       -- populated at T+90
+    exit_price      REAL,
+    realized_return_gross REAL,
+    realized_return_net   REAL,                 -- after friction
+    hit            INTEGER,                     -- 1 if net>0 else 0
+    evaluated_at   TEXT,                        -- when exit was computed
+    PRIMARY KEY (card_id, as_of, horizon_days)
+);
+
+-- Audit log for every promotion-gate decision. One row per (model, gate run).
+CREATE TABLE IF NOT EXISTS model_promotion_log (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    model_version   TEXT NOT NULL,
+    evaluated_at    TEXT NOT NULL,
+    decision        TEXT NOT NULL,              -- promoted | rejected
+    walkforward_sharpe REAL,
+    walkforward_hit_rate REAL,
+    walkforward_top_decile_net REAL,
+    walkforward_n   INTEGER,
+    reason          TEXT,
+    gate_version    TEXT,                       -- which thresholds were in effect
+    metrics_json    TEXT
+);
+
+-- Scaffold predictions from narrow-target models (reprint_event, pop_bump, ...)
+-- Kept separate from model_projections so the generic model and event-driven
+-- predictions can coexist and be evaluated independently.
+CREATE TABLE IF NOT EXISTS narrow_target_predictions (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    target_name     TEXT NOT NULL,              -- 'reprint_event' | 'pop_bump'
+    card_id         TEXT NOT NULL REFERENCES cards(id),
+    event_date      TEXT NOT NULL,              -- detection date
+    horizon_days    INTEGER NOT NULL,
+    predicted_return REAL,
+    confidence      REAL,
+    event_features_json TEXT,
+    model_version   TEXT,
+    created_at      TEXT DEFAULT (datetime('now')),
+    UNIQUE (target_name, card_id, event_date, horizon_days)
 );
 
 -- ============================================================
@@ -323,3 +384,8 @@ CREATE INDEX IF NOT EXISTS idx_set_daily_date ON set_daily(date);
 CREATE INDEX IF NOT EXISTS idx_leaderboard_date ON leaderboard(date);
 CREATE INDEX IF NOT EXISTS idx_model_projections_asof ON model_projections(as_of);
 CREATE INDEX IF NOT EXISTS idx_model_projections_card ON model_projections(card_id, horizon_days);
+CREATE INDEX IF NOT EXISTS idx_paper_trades_asof ON paper_trades(as_of);
+CREATE INDEX IF NOT EXISTS idx_paper_trades_exit ON paper_trades(exit_date);
+CREATE INDEX IF NOT EXISTS idx_paper_trades_unevaluated ON paper_trades(evaluated_at) WHERE evaluated_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_promotion_log_version ON model_promotion_log(model_version, evaluated_at);
+CREATE INDEX IF NOT EXISTS idx_narrow_predictions_target ON narrow_target_predictions(target_name, event_date);

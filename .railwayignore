@@ -1,0 +1,9 @@
+.git
+.venv
+__pycache__
+data/
+graphify-out/
+*.pyc
+*.png
+*.log
+.DS_Store
