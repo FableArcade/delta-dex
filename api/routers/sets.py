@@ -150,7 +150,7 @@ def sets_index(db=Depends(get_db_conn)):
         LEFT JOIN leaderboard l
             ON l.set_code = s.set_code
             AND l.date = (SELECT MAX(date) FROM leaderboard)
-        ORDER BY s.set_name
+        ORDER BY s.release_date DESC
     """).fetchall()
 
     return {"sets": [_set_summary(r) for r in rows]}
