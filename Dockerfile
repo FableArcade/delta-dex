@@ -77,7 +77,7 @@ if [ -f /data/pokemon.db ]; then\n\
     echo "Using persistent DB at /data/pokemon.db"\n\
 else\n\
     echo "Downloading DB snapshot from GitHub release..."\n\
-    curl -fSL https://github.com/FableArcade/delta-dex/releases/download/v0.1.0/pokemon.db.gz -o /tmp/pokemon.db.gz\n\
+    curl -fSL https://github.com/FableArcade/delta-dex/releases/download/v0.2.0/pokemon.db.gz -o /tmp/pokemon.db.gz\n\
     gunzip -c /tmp/pokemon.db.gz > /data/pokemon.db\n\
     rm -f /tmp/pokemon.db.gz\n\
     ln -sf /data/pokemon.db /app/data/pokemon.db\n\
