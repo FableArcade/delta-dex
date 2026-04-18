@@ -28,18 +28,13 @@ COPY . .
 RUN mkdir -p /app/data
 
 # Cron schedule — scrapers run on the server, not localhost.
-# Times are UTC. Adjust if needed.
-RUN echo "# 00:15 UTC (5:15 PM PDT) — eBay + prices after rate limit resets\n\
-15 0 * * * cd /app && /usr/local/bin/python -m scripts.populate_ebay_signal_universe >> /data/logs/cron_ebay.log 2>&1 && /usr/local/bin/python -m scripts.populate_ebay_dip_candidates >> /data/logs/cron_ebay.log 2>&1 && /usr/local/bin/python -m pipeline.daily_pipeline >> /data/logs/cron_daily.log 2>&1\n\
-# 10:00 UTC (3 AM PDT) — second eBay + prices run\n\
-0 10 * * * cd /app && /usr/local/bin/python -m scripts.populate_ebay_signal_universe >> /data/logs/cron_ebay.log 2>&1\n\
-30 10 * * * cd /app && /usr/local/bin/python -m scripts.populate_ebay_dip_candidates >> /data/logs/cron_ebay.log 2>&1\n\
-0 11 * * * cd /app && /usr/local/bin/python -m pipeline.daily_pipeline >> /data/logs/cron_daily.log 2>&1\n\
-# Weekly recompute\n\
-0 9 * * 0 cd /app && /usr/local/bin/python -m pipeline.daily_pipeline --stage compute >> /data/logs/cron_weekly.log 2>&1\n" \
-    > /etc/cron.d/pokedelta \
-    && chmod 0644 /etc/cron.d/pokedelta \
-    && crontab /etc/cron.d/pokedelta
+# Times are UTC. Env vars are injected at startup by start.sh.
+# The crontab is generated at runtime (not build time) so it
+# picks up the actual EBAY_APP_ID etc from Railway's env vars.
+RUN echo '#!/bin/bash\n\
+cd /app\n\
+source /etc/environment.sh\n\
+exec /usr/local/bin/python "$@"\n' > /app/cron-run.sh && chmod +x /app/cron-run.sh
 
 # Supervisor config — runs uvicorn + cron side by side
 RUN echo "[supervisord]\n\
@@ -89,9 +84,23 @@ else\n\
     echo "Seeded persistent DB from GitHub release ($(du -h /data/pokemon.db | cut -f1))"\n\
 fi\n\
 \n\
-# Pass env vars to cron (cron runs in a clean env by default)\n\
-printenv | grep -E "^(EBAY_|PRICECHARTING_|TCGPLAYER_|DATABASE_|ALERT_|PORT)" \\\n\
-    > /etc/environment 2>/dev/null || true\n\
+# Dump ALL env vars so cron scripts can source them\n\
+printenv > /etc/environment.sh 2>/dev/null || true\n\
+sed -i "s/^/export /" /etc/environment.sh\n\
+\n\
+# Generate crontab at runtime with env-aware wrapper\n\
+echo "# Delta Dex cron — generated at startup" > /etc/cron.d/deltadex\n\
+echo "15 0 * * * root /app/cron-run.sh -m scripts.populate_ebay_signal_universe >> /data/logs/cron_ebay.log 2>&1 && /app/cron-run.sh -m scripts.populate_ebay_dip_candidates >> /data/logs/cron_ebay.log 2>&1 && /app/cron-run.sh -m pipeline.daily_pipeline >> /data/logs/cron_daily.log 2>&1" >> /etc/cron.d/deltadex\n\
+echo "0 10 * * * root /app/cron-run.sh -m scripts.populate_ebay_signal_universe >> /data/logs/cron_ebay.log 2>&1" >> /etc/cron.d/deltadex\n\
+echo "30 10 * * * root /app/cron-run.sh -m scripts.populate_ebay_dip_candidates >> /data/logs/cron_ebay.log 2>&1" >> /etc/cron.d/deltadex\n\
+echo "0 11 * * * root /app/cron-run.sh -m pipeline.daily_pipeline >> /data/logs/cron_daily.log 2>&1" >> /etc/cron.d/deltadex\n\
+echo "0 9 * * 0 root /app/cron-run.sh -m pipeline.daily_pipeline --stage compute >> /data/logs/cron_weekly.log 2>&1" >> /etc/cron.d/deltadex\n\
+echo "" >> /etc/cron.d/deltadex\n\
+chmod 0644 /etc/cron.d/deltadex\n\
+\n\
+# Run eBay collection + pipeline immediately on first boot\n\
+echo "Running initial data collection..."\n\
+/app/cron-run.sh -m scripts.populate_ebay_signal_universe >> /data/logs/cron_ebay.log 2>&1 &\n\
 \n\
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/pokedelta.conf\n' \
     > /app/start.sh \
