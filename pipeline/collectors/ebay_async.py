@@ -166,6 +166,10 @@ class AsyncEBayCollector(EBayCollector):
             card_id = card["id"]
             try:
                 active_items = await self._async_search(card, sold=False)
+                if not active_items:
+                    # Empty = rate limited. Skip, don't write zeros.
+                    logger.debug("SKIP %s: empty active response", card_id)
+                    return False
                 active_agg = self._aggregate_listings(active_items, use_api_total=True)
 
                 ended_items = await self._async_search(card, sold=True)

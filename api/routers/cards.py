@@ -511,7 +511,7 @@ def card_detail(card_id: str, include: Optional[str] = None, db=Depends(get_db_c
                    new_adj, new_raw_adj, new_graded_adj,
                    ended_avg_raw_price_adj, ended_avg_psa_10_price_adj,
                    ended_avg_psa_9_price_adj
-            FROM ebay_history WHERE card_id = ? ORDER BY date ASC
+            FROM ebay_history WHERE card_id = ? AND active_to IS NOT NULL AND active_to > 0 ORDER BY date ASC
         """, (card_id,)).fetchall()
         result["history-ebay"] = [
             {

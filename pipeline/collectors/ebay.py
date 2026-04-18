@@ -340,6 +340,12 @@ class EBayCollector(BaseCollector):
             try:
                 # Active listings — use API total for real supply count
                 active_items = self._search_card(card, sold=False)
+                if not active_items:
+                    # Empty response = rate limited or no data. SKIP, don't
+                    # write zeros that would create a fake supply dip.
+                    errors += 1
+                    self.logger.debug("SKIP %s: empty active response", card_id)
+                    continue
                 active_agg = self._aggregate_listings(active_items, use_api_total=True)
 
                 # Recently ended/sold — use len(items) for 24h snapshot
