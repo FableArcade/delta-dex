@@ -49,6 +49,7 @@ fi\n\
 \n\
 echo "DB: DATABASE_URL=${DATABASE_URL:+SET}${DATABASE_URL:-NOT SET}"\n\
 \n\
+python3 -c "import os; print(f\\"PYTHON_ENV: DATABASE_URL={os.environ.get(\\'DATABASE_URL\\', \\'NOT SET\\')}\\", flush=True)"\n\
 exec uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-7860}\n' \
     > /app/start.sh \
     && chmod +x /app/start.sh
