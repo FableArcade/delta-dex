@@ -68,21 +68,10 @@ stderr_logfile_maxbytes=0\n" \
 RUN echo '#!/bin/bash\n\
 set -e\n\
 \n\
-# Ensure log dir exists on persistent volume\n\
 mkdir -p /data/logs\n\
 \n\
-# If DB exists on persistent volume, use it. Otherwise download from GitHub release.\n\
-if [ -f /data/pokemon.db ]; then\n\
-    ln -sf /data/pokemon.db /app/data/pokemon.db\n\
-    echo "Using persistent DB at /data/pokemon.db"\n\
-else\n\
-    echo "Downloading DB snapshot from GitHub release..."\n\
-    curl -fSL https://github.com/FableArcade/delta-dex/releases/download/v0.2.0/pokemon.db.gz -o /tmp/pokemon.db.gz\n\
-    gunzip -c /tmp/pokemon.db.gz > /data/pokemon.db\n\
-    rm -f /tmp/pokemon.db.gz\n\
-    ln -sf /data/pokemon.db /app/data/pokemon.db\n\
-    echo "Seeded persistent DB from GitHub release ($(du -h /data/pokemon.db | cut -f1))"\n\
-fi\n\
+# Data lives in Postgres (DATABASE_URL). No SQLite download needed.\n\
+echo "Using Postgres: ${DATABASE_URL:+connected}${DATABASE_URL:-NOT SET}"\n\
 \n\
 # Dump ALL env vars so cron scripts can source them\n\
 printenv > /etc/environment.sh 2>/dev/null || true\n\
