@@ -23,7 +23,7 @@ def _get_pool():
         url = os.environ.get("DATABASE_URL")
         if not url:
             raise RuntimeError("DATABASE_URL not set")
-        _pool = psycopg2.pool.ThreadedConnectionPool(1, 10, url)
+        _pool = psycopg2.pool.ThreadedConnectionPool(1, 10, url, connect_timeout=5)
     return _pool
 
 
