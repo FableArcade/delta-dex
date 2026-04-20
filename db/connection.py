@@ -10,8 +10,16 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 if DATABASE_URL:
     # Postgres mode — import everything from the Postgres module
-    from db.connection_pg import get_db, init_db
-else:
+    try:
+        from db.connection_pg import get_db, init_db
+        import sys
+        print("DB: Connected to Postgres", file=sys.stderr)
+    except Exception as exc:
+        import sys
+        print(f"DB: Postgres import failed ({exc}), falling back to SQLite", file=sys.stderr)
+        DATABASE_URL = None
+
+if not DATABASE_URL:
     # SQLite mode — local development
     import sqlite3
     from contextlib import contextmanager
