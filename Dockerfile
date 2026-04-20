@@ -87,10 +87,6 @@ echo "0 9 * * 0 root /app/cron-run.sh -m pipeline.daily_pipeline --stage compute
 echo "" >> /etc/cron.d/deltadex\n\
 chmod 0644 /etc/cron.d/deltadex\n\
 \n\
-# Run eBay collection + pipeline immediately on first boot\n\
-echo "Running initial data collection..."\n\
-/app/cron-run.sh -m scripts.populate_ebay_signal_universe >> /data/logs/cron_ebay.log 2>&1 &\n\
-\n\
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/pokedelta.conf\n' \
     > /app/start.sh \
     && chmod +x /app/start.sh
