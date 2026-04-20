@@ -9,12 +9,14 @@ import os
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 if DATABASE_URL:
-    print(f"DB: DATABASE_URL detected, importing Postgres module", flush=True)
+    import logging
+    _log = logging.getLogger("db.connection")
+    _log.warning("DB: DATABASE_URL detected, importing Postgres module")
     try:
         from db.connection_pg import get_db, init_db
-        print("DB: Postgres module imported OK", flush=True)
+        _log.warning("DB: Postgres module imported OK")
     except Exception as exc:
-        print(f"DB: IMPORT FAILED: {exc}", flush=True)
+        _log.warning(f"DB: IMPORT FAILED: {exc}")
         DATABASE_URL = None
 
 if not DATABASE_URL:
