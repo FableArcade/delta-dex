@@ -537,10 +537,10 @@ function computeMustBuyScore(card) {
         card._mbScore = null; card._mbComps = null; return;
     }
 
-    // Hard gate: supply saturation index MUST be < 1. A card with saturated
-    // current listings (sat ≥ 1) can't be a "must buy now" no matter how
-    // strong the other signals are.
-    if (satIdx === null || satIdx >= 1) {
+    // Hard gate: supply saturation index MUST be < 0.85. Cards near 1.0 are
+    // barely unsaturated — not genuinely tight supply. Tightened from 1.0 to
+    // 0.85 so only cards with real supply scarcity qualify.
+    if (satIdx === null || satIdx >= 0.85) {
         card._mbScore = null; card._mbComps = null; return;
     }
 
@@ -595,12 +595,10 @@ function computeMustBuyScore(card) {
     //     distribution lives in ≈[0.41, 1.0]. This remap spreads that range
     //     across the full 0..1 instead of compressing it into [0.5, 1.0]:
     //        sat=0.41 → 1.0 (min observed, maximally tight)
-    //        sat=0.75 → 0.50
-    //        sat=1.00 → 0.0  (right at the gate)
-    //     The old `1.5 - satIdx` formula pinned median to ~0.5 and wasted
-    //     half the range; this new slope actually discriminates across the
-    //     post-gate population.
-    const supplyTight = clamp01((1.0 - satIdx) / 0.6);
+    //        sat=0.63 → 0.50
+    //        sat=0.85 → 0.0  (right at the gate)
+    //     Post-gate range is [0.41, 0.85] after tightening the gate.
+    const supplyTight = clamp01((0.85 - satIdx) / 0.44);
 
     // 3c. Listing trend (0..1) — supply actively shrinking.
     //     active_listings_delta_pct measures the change in active listings
