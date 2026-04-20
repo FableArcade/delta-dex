@@ -63,36 +63,11 @@ stderr_logfile=/dev/stderr\n\
 stderr_logfile_maxbytes=0\n" \
     > /etc/supervisor/conf.d/pokedelta.conf
 
-# Force rebuild: v3-postgres
-# Startup script
-RUN echo '#!/bin/bash\n\
-set -e\n\
-\n\
-mkdir -p /tmp/logs\n\
-\n\
-# Data lives in Postgres (DATABASE_URL). No SQLite download needed.\n\
-echo "Using Postgres: ${DATABASE_URL:+connected}${DATABASE_URL:-NOT SET}"\n\
-\n\
-# Dump ALL env vars so cron scripts can source them\n\
-printenv > /etc/environment.sh 2>/dev/null || true\n\
-sed -i "s/^/export /" /etc/environment.sh\n\
-\n\
-# Generate crontab at runtime with env-aware wrapper\n\
-echo "# Delta Dex cron — generated at startup" > /etc/cron.d/deltadex\n\
-echo "15 0 * * * root /app/cron-run.sh -m scripts.populate_ebay_signal_universe >> /tmp/logs/cron_ebay.log 2>&1 && /app/cron-run.sh -m scripts.populate_ebay_dip_candidates >> /tmp/logs/cron_ebay.log 2>&1 && /app/cron-run.sh -m pipeline.daily_pipeline >> /tmp/logs/cron_daily.log 2>&1" >> /etc/cron.d/deltadex\n\
-echo "0 10 * * * root /app/cron-run.sh -m scripts.populate_ebay_signal_universe >> /tmp/logs/cron_ebay.log 2>&1" >> /etc/cron.d/deltadex\n\
-echo "30 10 * * * root /app/cron-run.sh -m scripts.populate_ebay_dip_candidates >> /tmp/logs/cron_ebay.log 2>&1" >> /etc/cron.d/deltadex\n\
-echo "0 11 * * * root /app/cron-run.sh -m pipeline.daily_pipeline >> /tmp/logs/cron_daily.log 2>&1" >> /etc/cron.d/deltadex\n\
-echo "0 9 * * 0 root /app/cron-run.sh -m pipeline.daily_pipeline --stage compute >> /tmp/logs/cron_weekly.log 2>&1" >> /etc/cron.d/deltadex\n\
-echo "" >> /etc/cron.d/deltadex\n\
-chmod 0644 /etc/cron.d/deltadex\n\
-\n\
-exec /usr/bin/supervisord -c /etc/supervisor/conf.d/pokedelta.conf\n' \
-    > /app/start.sh \
-    && chmod +x /app/start.sh
+# Startup script — proper file instead of inline echo
+RUN chmod +x /app/scripts/start.sh
 
 ENV PORT=7860
 EXPOSE 7860
 
-CMD ["/app/start.sh"]
+CMD ["/app/scripts/start.sh"]
 # Cache bust: 1776715472
