@@ -63,8 +63,8 @@ stderr_logfile=/dev/stderr\n\
 stderr_logfile_maxbytes=0\n" \
     > /etc/supervisor/conf.d/pokedelta.conf
 
-# Startup script: ensure /data dirs exist, symlink DB if on persistent volume,
-# pass env vars to cron, then start supervisor.
+# Force rebuild: v3-postgres
+# Startup script
 RUN echo '#!/bin/bash\n\
 set -e\n\
 \n\
