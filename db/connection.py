@@ -9,14 +9,12 @@ import os
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 if DATABASE_URL:
+    print(f"DB: DATABASE_URL detected, importing Postgres module", flush=True)
     try:
         from db.connection_pg import get_db, init_db
-        import psycopg2
-        test_conn = psycopg2.connect(DATABASE_URL, connect_timeout=5)
-        test_conn.close()
-        print("DB: POSTGRES CONNECTED OK", flush=True)
+        print("DB: Postgres module imported OK", flush=True)
     except Exception as exc:
-        print(f"DB: POSTGRES FAILED: {exc}", flush=True)
+        print(f"DB: IMPORT FAILED: {exc}", flush=True)
         DATABASE_URL = None
 
 if not DATABASE_URL:
