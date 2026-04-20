@@ -69,5 +69,5 @@ RUN chmod +x /app/scripts/start.sh
 ENV PORT=7860
 EXPOSE 7860
 
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["sh", "-c", "echo 'Container starting...' && python -c 'print(\"Python OK\")' && exec uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-7860}"]
 # Cache bust: 1776715472
