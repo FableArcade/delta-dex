@@ -23,9 +23,9 @@ RUN apt-get update \
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# App code (data/ excluded via .dockerignore — DB downloads on first boot)
+# App code — uses Postgres, no SQLite needed
 COPY . .
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data && echo "build-v3-postgres-$(date +%s)" > /app/.build-id
 
 # Cron schedule — scrapers run on the server, not localhost.
 # Times are UTC. Env vars are injected at startup by start.sh.
