@@ -9,14 +9,17 @@ import os
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 if DATABASE_URL:
-    # Postgres mode — import everything from the Postgres module
     try:
         from db.connection_pg import get_db, init_db
+        # Test the connection immediately
+        import psycopg2
+        test_conn = psycopg2.connect(DATABASE_URL, connect_timeout=5)
+        test_conn.close()
         import sys
-        print("DB: Connected to Postgres", file=sys.stderr)
+        print("DB: Postgres connected successfully", file=sys.stderr, flush=True)
     except Exception as exc:
         import sys
-        print(f"DB: Postgres import failed ({exc}), falling back to SQLite", file=sys.stderr)
+        print(f"DB: Postgres failed ({exc}), using SQLite", file=sys.stderr, flush=True)
         DATABASE_URL = None
 
 if not DATABASE_URL:
