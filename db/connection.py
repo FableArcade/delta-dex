@@ -11,15 +11,12 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 if DATABASE_URL:
     try:
         from db.connection_pg import get_db, init_db
-        # Test the connection immediately
         import psycopg2
         test_conn = psycopg2.connect(DATABASE_URL, connect_timeout=5)
         test_conn.close()
-        import sys
-        print("DB: Postgres connected successfully", file=sys.stderr, flush=True)
+        print("DB: POSTGRES CONNECTED OK", flush=True)
     except Exception as exc:
-        import sys
-        print(f"DB: Postgres failed ({exc}), using SQLite", file=sys.stderr, flush=True)
+        print(f"DB: POSTGRES FAILED: {exc}", flush=True)
         DATABASE_URL = None
 
 if not DATABASE_URL:
