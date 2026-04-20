@@ -54,6 +54,15 @@ RUN echo '#!/bin/bash\n\
 set -e\n\
 \n\
 mkdir -p /tmp/logs\n\
+mkdir -p /app/data\n\
+\n\
+# Download SQLite as fallback if Postgres fails\n\
+if [ ! -f /app/data/pokemon.db ]; then\n\
+    curl -fSL https://github.com/FableArcade/delta-dex/releases/download/v0.2.0/pokemon.db.gz -o /tmp/pokemon.db.gz 2>/dev/null && \\\n\
+    gunzip -c /tmp/pokemon.db.gz > /app/data/pokemon.db && \\\n\
+    rm -f /tmp/pokemon.db.gz && \\\n\
+    echo "SQLite fallback ready" || echo "SQLite download failed (non-fatal)"\n\
+fi\n\
 \n\
 # Dump env vars for cron\n\
 printenv > /etc/environment.sh 2>/dev/null || true\n\
