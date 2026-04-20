@@ -602,30 +602,34 @@ function computeMustBuyScore(card) {
     //     post-gate population.
     const supplyTight = clamp01((1.0 - satIdx) / 0.6);
 
-    // 3c. Price-range STABILITY (0..1) — behavioral scarcity.
-    //     A card whose PSA 10 price has stayed in a narrow band over 12 months
-    //     (small max−min spread relative to current) is a HELD asset — people
-    //     aren't flipping, they're stacking. A card with a wide 12mo range is
-    //     volatile / speculative. This is genuinely independent of listings
-    //     momentum.
-    let priceStable = null;
-    if (max1y !== null && min1y !== null && max1y > 0 && psa10 > 0 && historyDays >= 60) {
-        const range = (max1y - min1y) / psa10;
-        // range = 0.20 (20% swing) → 1.0, range = 1.0 (100% swing) → 0
-        priceStable = clamp01(1.25 - range * 1.25);
+    // 3c. Listing trend (0..1) — supply actively shrinking.
+    //     active_listings_delta_pct measures the change in active listings
+    //     vs the baseline period. Negative = listings declining = supply
+    //     drying up = bullish. This is a stronger signal than price stability
+    //     because it's a direct supply-side confirmation of accumulation.
+    //     Real-data range: roughly -50% to +50%.
+    //       -30% or worse → 1.0 (aggressive supply decline)
+    //       0% → 0.3 (neutral)
+    //       +20% or worse → 0.0 (supply flooding)
+    const listingDelta = numOrNull(card["active-listings-delta-pct"]);
+    let listingTrend = null;
+    if (listingDelta !== null) {
+        // Negative delta = declining supply = good. Flip sign so negative → high score.
+        listingTrend = clamp01((0.20 - listingDelta) / 0.50);
     }
 
     // Scarcity composite — three signals, weighted. Missing data scores 0
     // (not a default floor), so absence of signal never inflates the score.
-    // Alignment bonus: if all three present AND all ≥ 0.5, full credit;
-    // missing signals only contribute if they happen to be strong.
+    //   35% lifetime pop rarity
+    //   40% current supply tightness (saturation index)
+    //   25% listing trend (declining active listings)
     const popS    = popScarce    !== null ? popScarce    : 0;
-    const stableS = priceStable  !== null ? priceStable  : 0;
-    const scarcityRaw = 0.35 * popS + 0.40 * supplyTight + 0.25 * stableS;
+    const trendS  = listingTrend !== null ? listingTrend : 0;
+    const scarcityRaw = 0.35 * popS + 0.40 * supplyTight + 0.25 * trendS;
     // Misalignment penalty: if any KNOWN signal is < 0.3 the thesis is weak.
     const knowns = [supplyTight];
-    if (popScarce   !== null) knowns.push(popScarce);
-    if (priceStable !== null) knowns.push(priceStable);
+    if (popScarce    !== null) knowns.push(popScarce);
+    if (listingTrend !== null) knowns.push(listingTrend);
     const weakest = Math.min(...knowns);
     const alignmentPenalty = weakest < 0.3 ? 0.6 : weakest < 0.5 ? 0.85 : 1.0;
     const scarcity = scarcityRaw * alignmentPenalty;
@@ -821,7 +825,7 @@ function computeMustBuyScore(card) {
         // Scoring pathway metadata for the tooltip
         baseRoi, confMult, confLowBonus, setupBonus, setupSignals,
         // Sub-components for the breakdown tooltip
-        popScarce, supplyTight, priceStable, alignmentPenalty,
+        popScarce, supplyTight, listingTrend, listingDelta, alignmentPenalty,
         nf7Pct, nf30Pct, dem, sup, pop, satIdx, gemPct,
         ev: evForDisplay, roi: roiForDisplay,
         trajectory,
@@ -1633,7 +1637,7 @@ function buildMustBuyBreakdown(c) {
             ``,
             `Cultural moat      ${pct(m.cultural)}   →  ${pts(m.cultural, 15)} pts`,
             `Demand momentum    7d=${pctSigned(m.nf7Pct)} / 30d=${pctSigned(m.nf30Pct)}   →  ${pts(m.demand, 15)} pts`,
-            `Real scarcity      pop=${popStr} · sat=${satStr}${alignNote}   →  ${pts(m.scarcity, 15)} pts`,
+            `Real scarcity      pop=${popStr} · sat=${satStr} · listings=${m.listingDelta !== null ? pctSigned(m.listingDelta) : "—"}${alignNote}   →  ${pts(m.scarcity, 15)} pts`,
             `PSA 10 trajectory  ${trajLabel}   →  ${pts(m.momentum, 10)} pts`,
             `Grading value      EV ${evStr}  ROI ${roiStr}   →  ${pts(m.gradingValue, 10)} pts`,
             ``,
@@ -1653,7 +1657,7 @@ function buildMustBuyBreakdown(c) {
         ``,
         `Cultural impact    ${pct(m.cultural).padStart(4)}`,
         `Demand momentum    7d=${pctSigned(m.nf7Pct)} / 30d=${pctSigned(m.nf30Pct)}  → ${pct(m.demand)}`,
-        `Scarcity           pop=${popStr} · sat=${satStr}${alignNote}  → ${pct(m.scarcity)}`,
+        `Scarcity           pop=${popStr} · sat=${satStr} · listings=${m.listingDelta !== null ? pctSigned(m.listingDelta) : "—"}${alignNote}  → ${pct(m.scarcity)}`,
         `PSA 10 trajectory  ${trajLabel}  → ${pct(m.momentum)}`,
         `Grading value      EV ${evStr}  ROI ${roiStr}`,
     ].join("\n");
