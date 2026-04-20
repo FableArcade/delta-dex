@@ -16,7 +16,7 @@ WORKDIR /app
 # supervisor to run both uvicorn + cron in one container,
 # curl + gzip to download DB on first boot.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libgomp1 cron supervisor curl gzip \
+    && apt-get install -y --no-install-recommends libgomp1 libpq5 cron supervisor curl gzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Python deps
