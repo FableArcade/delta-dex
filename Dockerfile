@@ -1,7 +1,4 @@
-# Delta Dex — Production deploy with scrapers + cron.
-#
-# Runs FastAPI web server + cron scrapers in a single container.
-# SQLite DB should live on a persistent volume mounted at /data.
+# Delta Dex — Production deploy with Postgres + cron scrapers.
 
 FROM python:3.11-slim
 
@@ -12,31 +9,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# System deps: libgomp for LightGBM, cron for scheduled scrapers,
-# supervisor to run both uvicorn + cron in one container,
-# curl + gzip to download DB on first boot.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libgomp1 libpq5 cron supervisor curl gzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Python deps
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# App code — uses Postgres, no SQLite needed
 COPY . .
-RUN mkdir -p /app/data && echo "build-v3-postgres-$(date +%s)" > /app/.build-id
+RUN mkdir -p /app/data
 
-# Cron schedule — scrapers run on the server, not localhost.
-# Times are UTC. Env vars are injected at startup by start.sh.
-# The crontab is generated at runtime (not build time) so it
-# picks up the actual EBAY_APP_ID etc from Railway's env vars.
-RUN echo '#!/bin/bash\n\
-cd /app\n\
-source /etc/environment.sh\n\
-exec /usr/local/bin/python "$@"\n' > /app/cron-run.sh && chmod +x /app/cron-run.sh
+# Cron wrapper — sources env vars before running Python
+RUN echo '#!/bin/bash\ncd /app\nsource /etc/environment.sh 2>/dev/null\nexec /usr/local/bin/python "$@"\n' > /app/cron-run.sh && chmod +x /app/cron-run.sh
 
-# Supervisor config — runs uvicorn + cron side by side
+# Supervisor config
 RUN echo "[supervisord]\n\
 nodaemon=true\n\
 logfile=/tmp/supervisord.log\n\
@@ -63,11 +49,29 @@ stderr_logfile=/dev/stderr\n\
 stderr_logfile_maxbytes=0\n" \
     > /etc/supervisor/conf.d/pokedelta.conf
 
-# Startup script — proper file instead of inline echo
-RUN chmod +x /app/scripts/start.sh
+# Startup script — same inline pattern as the working old deploy
+RUN echo '#!/bin/bash\n\
+set -e\n\
+\n\
+mkdir -p /tmp/logs\n\
+\n\
+# Dump env vars for cron\n\
+printenv > /etc/environment.sh 2>/dev/null || true\n\
+sed -i "s/^/export /" /etc/environment.sh\n\
+\n\
+# Generate crontab\n\
+echo "15 0 * * * root /app/cron-run.sh -m scripts.populate_ebay_signal_universe >> /tmp/logs/cron_ebay.log 2>&1" > /etc/cron.d/deltadex\n\
+echo "0 10 * * * root /app/cron-run.sh -m scripts.populate_ebay_signal_universe >> /tmp/logs/cron_ebay.log 2>&1" >> /etc/cron.d/deltadex\n\
+echo "30 10 * * * root /app/cron-run.sh -m scripts.populate_ebay_dip_candidates >> /tmp/logs/cron_ebay.log 2>&1" >> /etc/cron.d/deltadex\n\
+echo "0 11 * * * root /app/cron-run.sh -m pipeline.daily_pipeline >> /tmp/logs/cron_daily.log 2>&1" >> /etc/cron.d/deltadex\n\
+echo "" >> /etc/cron.d/deltadex\n\
+chmod 0644 /etc/cron.d/deltadex\n\
+\n\
+exec /usr/bin/supervisord -c /etc/supervisor/conf.d/pokedelta.conf\n' \
+    > /app/start.sh \
+    && chmod +x /app/start.sh
 
 ENV PORT=7860
 EXPOSE 7860
 
-CMD ["sh", "-c", "echo 'Container starting...' && python -c 'print(\"Python OK\")' && exec uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-7860}"]
-# Cache bust: 1776715472
+CMD ["/app/start.sh"]
