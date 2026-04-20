@@ -37,7 +37,7 @@ stdout_logfile=/dev/stdout\n\
 stdout_logfile_maxbytes=0\n\
 stderr_logfile=/dev/stderr\n\
 stderr_logfile_maxbytes=0\n\
-environment=PYTHONPATH=/app\n\
+environment=PYTHONPATH=/app,DATABASE_URL="%(ENV_DATABASE_URL)s",EBAY_APP_ID="%(ENV_EBAY_APP_ID)s",EBAY_CERT_ID="%(ENV_EBAY_CERT_ID)s"\n\
 \n\
 [program:cron]\n\
 command=/usr/sbin/cron -f\n\
