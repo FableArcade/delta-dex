@@ -39,7 +39,7 @@ exec /usr/local/bin/python "$@"\n' > /app/cron-run.sh && chmod +x /app/cron-run.
 # Supervisor config — runs uvicorn + cron side by side
 RUN echo "[supervisord]\n\
 nodaemon=true\n\
-logfile=/data/logs/supervisord.log\n\
+logfile=/tmp/supervisord.log\n\
 pidfile=/tmp/supervisord.pid\n\
 \n\
 [program:uvicorn]\n\
@@ -68,7 +68,7 @@ stderr_logfile_maxbytes=0\n" \
 RUN echo '#!/bin/bash\n\
 set -e\n\
 \n\
-mkdir -p /data/logs\n\
+mkdir -p /tmp/logs\n\
 \n\
 # Data lives in Postgres (DATABASE_URL). No SQLite download needed.\n\
 echo "Using Postgres: ${DATABASE_URL:+connected}${DATABASE_URL:-NOT SET}"\n\
@@ -79,11 +79,11 @@ sed -i "s/^/export /" /etc/environment.sh\n\
 \n\
 # Generate crontab at runtime with env-aware wrapper\n\
 echo "# Delta Dex cron — generated at startup" > /etc/cron.d/deltadex\n\
-echo "15 0 * * * root /app/cron-run.sh -m scripts.populate_ebay_signal_universe >> /data/logs/cron_ebay.log 2>&1 && /app/cron-run.sh -m scripts.populate_ebay_dip_candidates >> /data/logs/cron_ebay.log 2>&1 && /app/cron-run.sh -m pipeline.daily_pipeline >> /data/logs/cron_daily.log 2>&1" >> /etc/cron.d/deltadex\n\
-echo "0 10 * * * root /app/cron-run.sh -m scripts.populate_ebay_signal_universe >> /data/logs/cron_ebay.log 2>&1" >> /etc/cron.d/deltadex\n\
-echo "30 10 * * * root /app/cron-run.sh -m scripts.populate_ebay_dip_candidates >> /data/logs/cron_ebay.log 2>&1" >> /etc/cron.d/deltadex\n\
-echo "0 11 * * * root /app/cron-run.sh -m pipeline.daily_pipeline >> /data/logs/cron_daily.log 2>&1" >> /etc/cron.d/deltadex\n\
-echo "0 9 * * 0 root /app/cron-run.sh -m pipeline.daily_pipeline --stage compute >> /data/logs/cron_weekly.log 2>&1" >> /etc/cron.d/deltadex\n\
+echo "15 0 * * * root /app/cron-run.sh -m scripts.populate_ebay_signal_universe >> /tmp/logs/cron_ebay.log 2>&1 && /app/cron-run.sh -m scripts.populate_ebay_dip_candidates >> /tmp/logs/cron_ebay.log 2>&1 && /app/cron-run.sh -m pipeline.daily_pipeline >> /tmp/logs/cron_daily.log 2>&1" >> /etc/cron.d/deltadex\n\
+echo "0 10 * * * root /app/cron-run.sh -m scripts.populate_ebay_signal_universe >> /tmp/logs/cron_ebay.log 2>&1" >> /etc/cron.d/deltadex\n\
+echo "30 10 * * * root /app/cron-run.sh -m scripts.populate_ebay_dip_candidates >> /tmp/logs/cron_ebay.log 2>&1" >> /etc/cron.d/deltadex\n\
+echo "0 11 * * * root /app/cron-run.sh -m pipeline.daily_pipeline >> /tmp/logs/cron_daily.log 2>&1" >> /etc/cron.d/deltadex\n\
+echo "0 9 * * 0 root /app/cron-run.sh -m pipeline.daily_pipeline --stage compute >> /tmp/logs/cron_weekly.log 2>&1" >> /etc/cron.d/deltadex\n\
 echo "" >> /etc/cron.d/deltadex\n\
 chmod 0644 /etc/cron.d/deltadex\n\
 \n\
