@@ -52,3 +52,13 @@ def db_debug():
         "DATABASE_URL_value": os.environ.get("DATABASE_URL", "NOT SET")[:30] + "...",
         "connection_module": str(type(get_db)),
     }
+
+@router.get("/db_debug2")
+def db_debug2():
+    import os
+    url = os.environ.get("DATABASE_URL", "")
+    return {
+        "DATABASE_URL_set": bool(url),
+        "DATABASE_URL_starts_with": url[:40] if url else "EMPTY/NONE",
+        "all_db_vars": {k: v[:20] for k, v in os.environ.items() if "DATABASE" in k or "PG" in k},
+    }
