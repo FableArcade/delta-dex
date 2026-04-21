@@ -1,38 +1,74 @@
-"""FastAPI dependency for request-scoped database connections."""
+"""FastAPI dependency for request-scoped database connections.
 
-import sqlite3
-from config.settings import DB_PATH
+Auto-detects Postgres (DATABASE_URL) vs SQLite (local dev).
+"""
 
+import os
 
-def get_db_conn():
-    """Yield a request-scoped SQLite connection with Row factory.
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
-    `check_same_thread=False` is required because FastAPI dispatches sync
-    dependencies and sync endpoints through a thread pool, and a single
-    request can be handled across more than one pool thread (dependency
-    setup, endpoint body, generator cleanup). The Python sqlite3 wrapper's
-    default is to refuse any cross-thread access, which raises
-    `ProgrammingError: SQLite objects created in a thread can only be used
-    in that same thread`. We turn that safety off because each request gets
-    its OWN connection here (never shared across requests), so there is no
-    real concurrent access to a single connection — just sequential access
-    from different worker threads within one request.
+if DATABASE_URL and DATABASE_URL.startswith("postgres"):
+    import psycopg2
+    import psycopg2.extras
+    import psycopg2.pool
+    import re
 
-    `timeout=30.0` + `busy_timeout = 10000` then handles the OTHER kind of
-    concurrency: the background bootstrap scraper holding a brief write
-    lock when the API gets a request. Readers wait up to 10s for the writer
-    to release instead of failing immediately.
-    """
-    conn = sqlite3.connect(
-        str(DB_PATH),
-        timeout=30.0,
-        check_same_thread=False,
-    )
-    conn.execute("PRAGMA journal_mode = WAL")
-    conn.execute("PRAGMA busy_timeout = 10000")
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.row_factory = sqlite3.Row
-    try:
-        yield conn
-    finally:
-        conn.close()
+    _pool = psycopg2.pool.ThreadedConnectionPool(1, 10, DATABASE_URL, connect_timeout=10)
+
+    class _PgRow(dict):
+        """Dict that also supports index access like sqlite3.Row."""
+        def keys(self):
+            return list(super().keys())
+
+    def get_db_conn():
+        conn = _pool.getconn()
+        try:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+            class _Wrapper:
+                def __init__(self):
+                    self._cursor = cursor
+                    self._conn = conn
+
+                def execute(self, sql, params=None):
+                    sql = sql.replace("?", "%s")
+                    sql = sql.replace("datetime('now')", "NOW()")
+                    sql = sql.replace("date('now')", "CURRENT_DATE")
+                    sql = sql.replace("date('now', 'localtime')", "CURRENT_DATE")
+                    sql = re.sub(r"date\('now',\s*'(-?\d+)\s*days?'\s*(?:,\s*'localtime')?\)", r"CURRENT_DATE + INTERVAL '\1 days'", sql)
+                    sql = re.sub(r"date\('now',\s*'-(\d+)\s*days?'\s*(?:,\s*'localtime')?\)", r"CURRENT_DATE - INTERVAL '\1 days'", sql)
+                    sql = re.sub(r"date\((\w+\.?\w*),\s*'-(\d+)\s*days?'\)", r"(\1::date - INTERVAL '\2 days')", sql)
+                    sql = sql.replace("IFNULL(", "COALESCE(")
+                    self._cursor.execute(sql, params)
+                    return self
+
+                def fetchone(self):
+                    row = self._cursor.fetchone()
+                    return dict(row) if row else None
+
+                def fetchall(self):
+                    return [dict(r) for r in self._cursor.fetchall()]
+
+            wrapper = _Wrapper()
+            yield wrapper
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            _pool.putconn(conn)
+
+else:
+    import sqlite3
+    from config.settings import DB_PATH
+
+    def get_db_conn():
+        conn = sqlite3.connect(str(DB_PATH), timeout=30.0, check_same_thread=False)
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA busy_timeout = 10000")
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.row_factory = sqlite3.Row
+        try:
+            yield conn
+        finally:
+            conn.close()
