@@ -43,3 +43,12 @@ def health(db=Depends(get_db_conn)):
             "table-row-counts": table_counts,
         },
     }
+
+@router.get("/db_debug")
+def db_debug():
+    import os
+    return {
+        "DATABASE_URL_set": bool(os.environ.get("DATABASE_URL")),
+        "DATABASE_URL_value": os.environ.get("DATABASE_URL", "NOT SET")[:30] + "...",
+        "connection_module": str(type(get_db)),
+    }
