@@ -32,12 +32,14 @@ if DATABASE_URL and DATABASE_URL.startswith("postgres"):
 
                 def execute(self, sql, params=None):
                     sql = sql.replace("?", "%s")
-                    sql = sql.replace("datetime('now')", "NOW()")
-                    sql = sql.replace("date('now')", "CURRENT_DATE")
-                    sql = sql.replace("date('now', 'localtime')", "CURRENT_DATE")
-                    sql = re.sub(r"date\('now',\s*'(-?\d+)\s*days?'\s*(?:,\s*'localtime')?\)", r"CURRENT_DATE + INTERVAL '\1 days'", sql)
-                    sql = re.sub(r"date\('now',\s*'-(\d+)\s*days?'\s*(?:,\s*'localtime')?\)", r"CURRENT_DATE - INTERVAL '\1 days'", sql)
-                    sql = re.sub(r"date\((\w+\.?\w*),\s*'-(\d+)\s*days?'\)", r"(\1::date - INTERVAL '\2 days')", sql)
+                    sql = sql.replace("datetime('now')", "NOW()::text")
+                    sql = sql.replace("date('now')", "CURRENT_DATE::text")
+                    sql = sql.replace("date('now', 'localtime')", "CURRENT_DATE::text")
+                    # date('now', '-N days') → text for comparison with TEXT date columns
+                    sql = re.sub(r"date\('now',\s*'-(\d+)\s*days?'\s*(?:,\s*'localtime')?\)", r"(CURRENT_DATE - INTERVAL '\1 days')::date::text", sql)
+                    sql = re.sub(r"date\('now',\s*'(-?\d+)\s*days?'\s*(?:,\s*'localtime')?\)", r"(CURRENT_DATE + INTERVAL '\1 days')::date::text", sql)
+                    # date(column, '-N days') → text
+                    sql = re.sub(r"date\((\w+\.?\w*),\s*'-(\d+)\s*days?'\)", r"((\1::date - INTERVAL '\2 days')::date::text)", sql)
                     sql = sql.replace("IFNULL(", "COALESCE(")
                     self._cursor.execute(sql, params)
                     return self
