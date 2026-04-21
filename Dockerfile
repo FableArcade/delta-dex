@@ -1,7 +1,7 @@
 # Delta Dex — Production deploy with Postgres + cron scrapers.
 
 FROM python:3.11-slim
-
+# no-cache-v2
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
