@@ -1,25 +1,16 @@
-"""Database connection layer — auto-detects SQLite vs Postgres.
-
-If DATABASE_URL is set, uses Postgres (production on Railway).
-Otherwise, uses local SQLite (development).
-"""
+"""Database connection layer — auto-detects SQLite vs Postgres."""
 
 import os
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
+_url = os.environ.get("DATABASE_URL", "")
 
-if DATABASE_URL:
-    import logging
-    _log = logging.getLogger("db.connection")
-    _log.warning("DB: DATABASE_URL detected, importing Postgres module")
-    try:
-        from db.connection_pg import get_db, init_db
-        _log.warning("DB: Postgres module imported OK")
-    except Exception as exc:
-        _log.warning(f"DB: IMPORT FAILED: {exc}")
-        DATABASE_URL = None
+# Write to a file so we can verify what Python sees
+with open("/tmp/db_debug.txt", "w") as f:
+    f.write(f"DATABASE_URL={_url[:20] if _url else 'NONE'}\n")
 
-if not DATABASE_URL:
+if _url and _url.startswith("postgres"):
+    from db.connection_pg import get_db, init_db  # noqa
+else:
     # SQLite mode — local development
     import sqlite3
     from contextlib import contextmanager
