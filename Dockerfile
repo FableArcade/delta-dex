@@ -23,6 +23,8 @@ RUN mkdir -p /app/data \
     && chmod +x /app/cron-run.sh
 
 ENV PORT=7860
+# Railway's env vars override these defaults
+ENV DATABASE_URL=""
 EXPOSE 7860
 
-CMD ["/app/scripts/start.sh"]
+CMD ["sh", "-c", "mkdir -p /app/data && curl -fSL https://github.com/FableArcade/delta-dex/releases/download/v0.2.0/pokemon.db.gz -o /tmp/pokemon.db.gz 2>/dev/null && gunzip -c /tmp/pokemon.db.gz > /app/data/pokemon.db && rm /tmp/pokemon.db.gz; echo DB_URL=$DATABASE_URL | head -c 50; exec uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-7860}"]
