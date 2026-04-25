@@ -50,6 +50,24 @@ class PgCursorWrapper:
     def execute(self, sql, params=None):
         # Convert SQLite ? placeholders to Postgres %s
         sql = sql.replace("?", "%s")
+        # INSERT OR REPLACE → INSERT ... ON CONFLICT DO UPDATE
+        import re as _re
+        if "INSERT OR REPLACE INTO" in sql:
+            # Extract table name and columns
+            m = _re.match(r"INSERT OR REPLACE INTO\s+(\w+)\s*\(([^)]+)\)", sql, _re.I | _re.S)
+            if m:
+                table = m.group(1)
+                cols = [c.strip() for c in m.group(2).split(",")]
+                # Assume first column is the primary key for conflict
+                conflict_cols = "card_id, window_days, mode, as_of" if table == "market_pressure" else "card_id, mode, as_of" if table == "supply_saturation" else cols[0]
+                updates = ", ".join(f"{c} = EXCLUDED.{c}" for c in cols[1:])
+                sql = sql.replace("INSERT OR REPLACE INTO", "INSERT INTO")
+                sql = sql.rstrip().rstrip(";")
+                sql += f" ON CONFLICT ({conflict_cols}) DO UPDATE SET {updates}"
+        # INSERT OR IGNORE → INSERT ... ON CONFLICT DO NOTHING
+        sql = sql.replace("INSERT OR IGNORE INTO", "INSERT INTO")
+        if "ON CONFLICT" not in sql and "DO NOTHING" not in sql and sql.strip().upper().startswith("INSERT INTO"):
+            pass  # leave as-is, conflict handled above
         # Convert SQLite datetime('now') to Postgres NOW()
         sql = sql.replace("datetime('now')", "NOW()")
         sql = sql.replace("date('now')", "CURRENT_DATE")
