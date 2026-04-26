@@ -33,10 +33,39 @@ def health(db=Depends(get_db_conn)):
     total_cards = table_counts.get("cards", 0)
     total_sets = table_counts.get("sets", 0)
 
+    # Market pressure freshness
+    mp_row = db.execute(
+        "SELECT MAX(as_of) AS latest, COUNT(DISTINCT card_id) AS cards "
+        "FROM market_pressure WHERE window_days = 30 AND mode = 'observed'"
+    ).fetchone()
+    mp_latest = mp_row["latest"] if mp_row else None
+    mp_cards = mp_row["cards"] if mp_row else 0
+
+    # eBay collection freshness
+    ebay_row = db.execute(
+        "SELECT MAX(date) AS latest, COUNT(DISTINCT card_id) AS cards "
+        "FROM ebay_history"
+    ).fetchone()
+    ebay_latest = ebay_row["latest"] if ebay_row else None
+    ebay_cards = ebay_row["cards"] if ebay_row else 0
+
+    # Cron log check
+    cron_row = db.execute(
+        "SELECT MAX(date) AS latest FROM price_history"
+    ).fetchone()
+    price_latest = cron_row["latest"] if cron_row else None
+
     return {
         "status": "ok",
         "generated-at": datetime.utcnow().strftime("%Y-%m-%d"),
         "last-pipeline-run": last_run,
+        "freshness": {
+            "market-pressure-latest": mp_latest,
+            "market-pressure-cards": mp_cards,
+            "ebay-history-latest": ebay_latest,
+            "ebay-history-cards": ebay_cards,
+            "price-history-latest": price_latest,
+        },
         "db-stats": {
             "total-sets": total_sets,
             "total-cards": total_cards,
