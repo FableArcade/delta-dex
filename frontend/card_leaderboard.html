@@ -581,8 +581,13 @@
                     <input type="range" id="ds-min-nfpct" min="0" max="0.04" step="0.002" value="0.010">
                     <span id="ds-min-nfpct-val" style="font-weight:bold;min-width:42px;text-align:right;">+1.0%</span>
                 </div>
+                <div class="opp-control" title="Minimum demand/supply ratio. 1.05 = demand exceeds supply by 5%. Higher = stricter filter.">
+                    <label for="ds-min-ratio">Min D/S ratio</label>
+                    <input type="range" id="ds-min-ratio" min="1.0" max="1.5" step="0.05" value="1.05">
+                    <span id="ds-min-ratio-val" style="font-weight:bold;min-width:42px;text-align:right;">1.05×</span>
+                </div>
                 <span class="opp-philosophy">Flow screen: cards being absorbed faster than listed</span>
-                <span class="opp-formula-note">Gated on: daily net flow ≥ 1% of pool, supply saturation &lt; 1, demand/supply ratio ≥ 1.2×. Ranked by D/S ratio.</span>
+                <span class="opp-formula-note">Gated on: daily net flow ≥ 1% of pool, supply saturation &lt; 1, demand/supply ratio ≥ 1.05×. Ranked by D/S ratio.</span>
             </div>
 
             <!-- Controls specific to Best Grading Play view -->

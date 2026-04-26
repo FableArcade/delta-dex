@@ -124,6 +124,7 @@ let chaseMinDemand = -0.005;
 // 0-20% range and filtered out every single card.
 let dsMinPsa10 = 100;
 let dsMinNfPct = 0.010;  // 1.0% daily = ~7% weekly absorption
+let dsMinRatio = 1.05;   // demand/supply ratio floor — 1.05 = 5% more demand than supply
 
 // Best Grading Play view knobs
 // Raw floor is $30 by default: below that, the $25 grading fee dominates
@@ -867,7 +868,7 @@ function filterDemandSurge() {
         const dem = Number(c["demand-pressure"]);
         const sup = Number(c["supply-pressure"]);
         if (!Number.isFinite(dem) || !Number.isFinite(sup) || sup <= 0) continue;
-        if (dem / sup < 1.2) continue;
+        if (dem / sup < dsMinRatio) continue;
 
         // Attach projection data
         if (hasProj) {
@@ -2328,6 +2329,16 @@ function wireToolbar() {
         dsNfSlider.addEventListener("input", () => {
             dsMinNfPct = Number(dsNfSlider.value);
             if (dsNfVal) dsNfVal.textContent = (dsMinNfPct >= 0 ? "+" : "") + (dsMinNfPct * 100).toFixed(1) + "%";
+            if (view === "demandsurge") fullRender();
+        });
+    }
+
+    const dsRatioSlider = document.getElementById("ds-min-ratio");
+    const dsRatioVal = document.getElementById("ds-min-ratio-val");
+    if (dsRatioSlider) {
+        dsRatioSlider.addEventListener("input", () => {
+            dsMinRatio = Number(dsRatioSlider.value);
+            if (dsRatioVal) dsRatioVal.textContent = dsMinRatio.toFixed(2) + "×";
             if (view === "demandsurge") fullRender();
         });
     }
