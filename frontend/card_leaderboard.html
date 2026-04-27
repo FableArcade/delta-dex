@@ -45,12 +45,12 @@
             background: #dfdfdf;
         }
         .opp-tab.holds.active        { color: #003388; }
-        .opp-tab.buythedip.active    { color: #004080; background: #d8e8ff; }
+        .opp-tab.trending.active     { color: #804000; background: #fff0d8; }
         .opp-tab.mustbuy.active      { color: #806000; background: #fff6d8; }
         .opp-tab.topchase.active     { color: #800040; background: #ffe4f0; }
         .opp-tab.demandsurge.active  { color: #004080; background: #e4f0ff; }
         .opp-tab.bestgrading.active  { color: #006400; background: #e8ffe8; }
-        .opp-tab.buythedip,
+        .opp-tab.trending,
         .opp-tab.mustbuy,
         .opp-tab.topchase,
         .opp-tab.demandsurge,
@@ -59,7 +59,7 @@
         .opp-controls-ev,
         .opp-controls-holds,
         .opp-controls-mustbuy,
-        .opp-controls-buythedip,
+        .opp-controls-trending,
         .opp-controls-sentiment {
             display: flex;
             flex-wrap: wrap;
@@ -351,7 +351,7 @@
             .opp-controls-ev,
             .opp-controls-holds,
             .opp-controls-mustbuy,
-            .opp-controls-buythedip,
+            .opp-controls-trending,
             .opp-controls-topchase,
             .opp-controls-demandsurge,
             .opp-controls-bestgrading,
@@ -417,18 +417,16 @@
             table.win-table[data-view] thead th:nth-child(4),
             table.win-table[data-view] tbody td:nth-child(4) { display: none; }
 
-            /* Buy the Dip (12 cols): keep PSA10(5), NF30D(8→moved), SCORE(12)
-               Hide: ATH(6), ATHDATE(7), SATIDX(9), NF7D(10), NF30D(11) */
-            table.win-table[data-view="buythedip"] thead th:nth-child(6),
-            table.win-table[data-view="buythedip"] tbody td:nth-child(6),
-            table.win-table[data-view="buythedip"] thead th:nth-child(7),
-            table.win-table[data-view="buythedip"] tbody td:nth-child(7),
-            table.win-table[data-view="buythedip"] thead th:nth-child(9),
-            table.win-table[data-view="buythedip"] tbody td:nth-child(9),
-            table.win-table[data-view="buythedip"] thead th:nth-child(10),
-            table.win-table[data-view="buythedip"] tbody td:nth-child(10),
-            table.win-table[data-view="buythedip"] thead th:nth-child(11),
-            table.win-table[data-view="buythedip"] tbody td:nth-child(11) { display: none; }
+            /* Trending Now (11 cols): #(1) IMG(2) NAME(3) SET(4) PSA10(5) 7D(6) 30D(7) NF%(8) SAT(9) ROOM(10) SCORE(11)
+               Mobile: keep PSA10(5), 7D(6), SCORE(11). Hide: 30D(7), NF%(8), SAT(9), ROOM(10) */
+            table.win-table[data-view="trending"] thead th:nth-child(7),
+            table.win-table[data-view="trending"] tbody td:nth-child(7),
+            table.win-table[data-view="trending"] thead th:nth-child(8),
+            table.win-table[data-view="trending"] tbody td:nth-child(8),
+            table.win-table[data-view="trending"] thead th:nth-child(9),
+            table.win-table[data-view="trending"] tbody td:nth-child(9),
+            table.win-table[data-view="trending"] thead th:nth-child(10),
+            table.win-table[data-view="trending"] tbody td:nth-child(10) { display: none; }
 
             /* Top Picks (11 cols): keep PSA10(5), SCORE(11)
                Hide: PROJ(6), CONF(7), CULTURE(8), DEMAND(9), SCARCITY(10) */
@@ -563,7 +561,7 @@
         <div class="opp-toolbar">
             <div class="opp-tabs">
                 <button class="opp-tab mustbuy active"    data-view="mustbuy"><span class="tab-full">&#9889; Top Picks</span><span class="tab-short">&#9889; Picks</span></button>
-                <button class="opp-tab buythedip"         data-view="buythedip"><span class="tab-full">&#8600; Buy the Dip</span><span class="tab-short">&#8600; Dip</span></button>
+                <button class="opp-tab trending"         data-view="trending"><span class="tab-full">&#128293; Trending Now</span><span class="tab-short">&#128293; Hot</span></button>
                 <button class="opp-tab topchase"          data-view="topchase"><span class="tab-full">&#128293; Top Chase</span><span class="tab-short">&#128293; Chase</span></button>
                 <button class="opp-tab demandsurge"       data-view="demandsurge"><span class="tab-full">&#128200; Demand Surge</span><span class="tab-short">&#128200; Surge</span></button>
                 <button class="opp-tab bestgrading"       data-view="bestgrading"><span class="tab-full">&#128142; Best Grading Play</span><span class="tab-short">&#128142; Grade</span></button>
@@ -604,24 +602,19 @@
                 <span class="opp-formula-note">Real EV: <code>gem%&nbsp;×&nbsp;PSA10 + p9&nbsp;×&nbsp;PSA9 + p8&nbsp;×&nbsp;PSA8 − $25 fee − raw</code>. Only cards with EV&nbsp;&gt;&nbsp;0 shown. <code>~</code> on gem% = PSA pop data missing (conservative 10% assumed).</span>
             </div>
 
-            <!-- Controls specific to Buy the Dip view -->
-            <div class="opp-controls-buythedip">
-                <div class="opp-control" title="Minimum PSA 10 price. Default $10.">
-                    <label for="dip-min-psa10">Min PSA 10 $</label>
-                    <input type="number" id="dip-min-psa10" min="0" max="10000" step="5" value="10">
+            <!-- Controls specific to Trending Now view -->
+            <div class="opp-controls-trending">
+                <div class="opp-control" title="Minimum PSA 10 price. Default $50.">
+                    <label for="trend-min-psa10">Min PSA 10 $</label>
+                    <input type="number" id="trend-min-psa10" min="0" max="10000" step="25" value="50">
                 </div>
-                <div class="opp-control" title="Minimum dip from all-time high. 20% = at least 20% below ATH.">
-                    <label for="dip-min-dippct">Min dip %</label>
-                    <input type="range" id="dip-min-dippct" min="0.10" max="0.80" step="0.05" value="0.20">
-                    <span id="dip-min-dippct-val" style="font-weight:bold;min-width:28px;text-align:right;">20%</span>
+                <div class="opp-control" title="Minimum trend score (0-100). Higher = stricter.">
+                    <label for="trend-min-score">Min score</label>
+                    <input type="range" id="trend-min-score" min="0" max="60" step="5" value="20">
+                    <span id="trend-min-score-val" style="font-weight:bold;min-width:28px;text-align:right;">20</span>
                 </div>
-                <div class="opp-control" title="Minimum dip score (0-100).">
-                    <label for="dip-min-score">Min score</label>
-                    <input type="range" id="dip-min-score" min="0" max="80" step="5" value="30">
-                    <span id="dip-min-score-val" style="font-weight:bold;min-width:28px;text-align:right;">30</span>
-                </div>
-                <span class="opp-philosophy">Dip hunting: cards fallen from ATH with reversal signals</span>
-                <span class="opp-formula-note">Score = 50% dip depth (% off all-time high) + 15% supply tightening + 15% net flow reversal + 10% price recovering + 10% cultural floor. Gated: ≥20% off ATH, supply sat &lt; 1, positive net flow.</span>
+                <span class="opp-philosophy">Hot movers: cards with rising prices confirmed by demand</span>
+                <span class="opp-formula-note">Score = 30% 7d price velocity + 20% 30d velocity + 20% net flow acceleration + 15% listing tightening + 15% room to run. Gated: positive 7d price change.</span>
             </div>
 
             <!-- Controls specific to Top Picks view (smart-investor composite) -->

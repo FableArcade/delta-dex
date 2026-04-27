@@ -65,7 +65,7 @@ function cardEra(card) {
     return "unknown";
 }
 
-let view = "mustbuy";  // "mustbuy" | "buythedip" | "topchase" | "demandsurge" | "bestgrading" | "holds"
+let view = "mustbuy";  // "mustbuy" | "trending" | "topchase" | "demandsurge" | "bestgrading" | "holds"
 
 // Constants used by computeEvScore (which feeds into Must Buy Now's hard gates).
 // No UI to tweak these now — Must Buy Now uses fixed defaults so the score is
@@ -134,10 +134,9 @@ let dsMinRatio = 1.05;   // demand/supply ratio floor — 1.05 = 5% more demand 
 let bgMinPsa10 = 100;
 let bgMinRaw = 30;
 
-// Buy the Dip view knobs
-let dipMinPsa10 = 10;
-let dipMinDipPct = 0.20;   // 20% off ATH minimum
-let dipMinScore = 30;
+// Trending Now view knobs
+let trendMinPsa10 = 50;
+let trendMinScore = 20;
 
 let displayedCount = 0;
 const PAGE_SIZE = 100;
@@ -1034,78 +1033,84 @@ function filterHolds() {
     return out;
 }
 
-// --- Buy the Dip ---
+// --- Trending Now ---
 
-function computeDipScore(card) {
-    card._dipScore = null;
-    card._dipComps = null;
+function computeTrendScore(card) {
+    card._trendScore = null;
+    card._trendComps = null;
     if (card["is-sealed"]) return;
 
     const numOrNull = (v) => (v === null || v === undefined || v === "") ? null : Number(v);
     const clamp01 = v => Math.max(0, Math.min(1, v));
 
     const psa10 = numOrNull(card["psa-10-price"]);
-    if (psa10 === null || psa10 < dipMinPsa10) return;
+    if (psa10 === null || psa10 < trendMinPsa10) return;
 
+    // Need at least 7d price data to measure velocity
+    const p30 = numOrNull(card["psa10-30d-ago"]);
+    const p90 = numOrNull(card["psa10-90d-ago"]);
     const ath = numOrNull(card["psa10-ath"]);
-    if (ath === null || ath <= 0) return;
 
-    const dipPct = (ath - psa10) / ath;
-    if (dipPct < dipMinDipPct) return;
+    // 7d velocity: use 30d-ago as proxy (price now vs 30d ago)
+    // Must be positive — we only want cards going UP
+    const vel7d = p30 !== null && p30 > 0 ? (psa10 - p30) / p30 : null;
+    if (vel7d === null || vel7d <= 0) return;  // hard gate: must be rising
 
-    // Soft gate: if sat data exists and is >= 1, penalize but don't exclude.
-    // Cards without market data still qualify on dip + price recovery alone.
-    const satIdx = numOrNull(card["supply-saturation-index"]);
+    // 30d velocity: price now vs 90d ago
+    const vel30d = p90 !== null && p90 > 0 ? (psa10 - p90) / p90 : null;
 
-    const nf7  = numOrNull(card["net-flow-7d"]);
-    const nf30 = numOrNull(card["net-flow-30d"]);
+    // Market data (optional but boosts score)
     const nf7Pct  = numOrNull(card["net-flow-pct-7d"]);
     const nf30Pct = numOrNull(card["net-flow-pct-30d"]);
+    const satIdx  = numOrNull(card["supply-saturation-index"]);
 
-    // 1. Dip depth (50 pts) — 20% off = 0, 80%+ off = 50
-    const dipDepth = clamp01((dipPct - 0.20) / 0.60) * 50;
+    // 1. 7d price velocity (30 pts) — 0% = 0, 30%+ = max
+    const vel7Score = clamp01(vel7d / 0.30) * 30;
 
-    // 2. Supply signal (10 pts) — bonus when sat data exists and is tight
-    let supplyScore = 0;
-    if (satIdx !== null) {
-        supplyScore = satIdx < 1 ? clamp01(1.0 - satIdx) * 10 : 0;
+    // 2. 30d price velocity (20 pts) — confirms sustained trend
+    const vel30Score = vel30d !== null && vel30d > 0
+        ? clamp01(vel30d / 0.50) * 20
+        : 0;
+
+    // 3. Net flow acceleration (20 pts) — demand is increasing
+    //    Positive 7d flow = demand absorbing supply RIGHT NOW
+    let flowAccelScore = 0;
+    if (nf7Pct !== null && nf7Pct > 0) {
+        flowAccelScore += clamp01(nf7Pct / 0.03) * 12;
+    }
+    if (nf30Pct !== null && nf30Pct > 0) {
+        flowAccelScore += clamp01(nf30Pct / 0.03) * 8;
     }
 
-    // 3. Net flow reversal (10 pts) — bonus when flow data exists and is positive
-    const nf7Norm  = nf7Pct  !== null ? clamp01((nf7Pct  + 0.01) / 0.05) : 0;
-    const nf30Norm = nf30Pct !== null ? clamp01((nf30Pct + 0.01) / 0.05) : 0;
-    const flowScore = (nf7Norm * 0.40 + nf30Norm * 0.60) * 10;
+    // 4. Volume spike / listing activity (15 pts)
+    //    Supply saturation < 1 means listings are tightening (bullish)
+    //    active_listings_delta_pct shows if listing volume is changing
+    let volumeScore = 0;
+    if (satIdx !== null && satIdx < 1) {
+        volumeScore = clamp01(1.0 - satIdx) * 15;
+    }
 
-    // 4. Price recovering (20 pts) — the key "slight reversal" signal.
-    //    Current > 30d ago means price is climbing off a bottom.
-    //    Current > 1y min means we're not AT the floor (falling knife).
-    //    Partial credit: 10 pts for each condition met.
-    const a30   = numOrNull(card["psa10-30d-ago"]);
-    const min1y = numOrNull(card["psa10-min-1y"]);
-    let recoverScore = 0;
-    const priceUp   = a30 !== null && a30 > 0 && psa10 > a30;
-    const offBottom = min1y !== null && psa10 > min1y;
-    if (priceUp)   recoverScore += 10;
-    if (offBottom) recoverScore += 10;
+    // 5. Room to run (15 pts) — not at ATH, so there's upside
+    //    At ATH = 0 pts. 50%+ below ATH = max pts.
+    let roomScore = 0;
+    if (ath !== null && ath > 0) {
+        const belowAth = (ath - psa10) / ath;
+        roomScore = belowAth > 0.01 ? clamp01(belowAth / 0.50) * 15 : 0;
+    }
 
-    // 5. Cultural floor (10 pts)
-    const cultural = culturalImpactScore(card);
-    const culturalScore = cultural * 10;
-
-    const score = Math.round(dipDepth + supplyScore + flowScore + recoverScore + culturalScore);
-    card._dipScore = score;
-    card._dipComps = {
-        dipPct, dipDepth, supplyScore, flowScore, recoverScore,
-        culturalScore, cultural, satIdx, nf7Pct, nf30Pct,
-        ath, priceUp, offBottom,
+    const score = Math.round(vel7Score + vel30Score + flowAccelScore + volumeScore + roomScore);
+    card._trendScore = score;
+    card._trendComps = {
+        vel7d, vel30d, vel7Score, vel30Score, flowAccelScore,
+        volumeScore, roomScore, satIdx, nf7Pct, nf30Pct, ath,
     };
 }
 
-function filterBuyTheDip() {
+function filterTrending() {
     const out = [];
     for (const c of allCards) {
-        if (!Number.isFinite(c._dipScore)) continue;
-        if (c._dipScore < dipMinScore) continue;
+        if (!Number.isFinite(c._trendScore)) continue;
+        if (c._trendScore < trendMinScore) continue;
         out.push(c);
     }
     return out;
@@ -1113,19 +1118,18 @@ function filterBuyTheDip() {
 
 // --- sort ---
 
-function getSortValueDip(card, key) {
+function getSortValueTrend(card, key) {
     switch (key) {
-        case "name":      return (card["product-name"] || "").toLowerCase();
-        case "set":       return (card["set-code"] || "").toLowerCase();
-        case "psa10":     return Number(card["psa-10-price"]) || 0;
-        case "ath":       return Number(card["psa10-ath"]) || 0;
-        case "athdate":   return card["psa10-ath-date"] || "";
-        case "dippct":    return card._dipComps ? card._dipComps.dipPct : 0;
-        case "satidx":    return Number(card["supply-saturation-index"]) || 0;
-        case "nf7":       return Number(card["net-flow-pct-7d"]) || -Infinity;
-        case "nf30":      return Number(card["net-flow-pct-30d"]) || -Infinity;
-        case "dipscore":  return Number.isFinite(card._dipScore) ? card._dipScore : -Infinity;
-        default:           return 0;
+        case "name":       return (card["product-name"] || "").toLowerCase();
+        case "set":        return (card["set-code"] || "").toLowerCase();
+        case "psa10":      return Number(card["psa-10-price"]) || 0;
+        case "vel7d":      return card._trendComps ? card._trendComps.vel7d : -Infinity;
+        case "vel30d":     return card._trendComps ? (card._trendComps.vel30d || -Infinity) : -Infinity;
+        case "nfpct":      return Number(card["net-flow-pct-7d"]) || -Infinity;
+        case "satidx":     return Number(card["supply-saturation-index"]) || 999;
+        case "room":       return card._trendComps ? card._trendComps.roomScore : -Infinity;
+        case "trendscore": return Number.isFinite(card._trendScore) ? card._trendScore : -Infinity;
+        default:            return 0;
     }
 }
 
@@ -1213,13 +1217,13 @@ function getSortValueHold(card, key) {
 function sortList(list) {
     const { key, dir } = currentSort;
     const getter =
-        view === "buythedip"   ? getSortValueDip :
+        view === "trending"   ? getSortValueTrend :
         view === "holds"       ? getSortValueHold :
         view === "mustbuy"     ? getSortValueMustBuy :
         view === "topchase"    ? getSortValueTopChase :
         view === "demandsurge" ? getSortValueDemandSurge :
         view === "bestgrading" ? getSortValueBestGrading :
-                                  getSortValueDip;  // safe fallback
+                                  getSortValueTrend;  // safe fallback
     list.sort((a, b) => {
         const av = getter(a, key);
         const bv = getter(b, key);
@@ -1233,19 +1237,18 @@ function sortList(list) {
 // --- table header rendering (per-view) ---
 
 const HEADERS = {
-    buythedip: [
-        { key: "rank",     label: "#",          width: 50 },
-        { key: "none",     label: "IMAGE",      width: 60 },
-        { key: "name",     label: "CARD NAME" },
-        { key: "set",      label: "SET" },
-        { key: "psa10",    label: "PSA 10" },
-        { key: "ath",      label: "ATH" },
-        { key: "athdate",  label: "ATH DATE" },
-        { key: "dippct",   label: "DIP %" },
-        { key: "satidx",   label: "SAT IDX" },
-        { key: "nf7",      label: "NF 7D %" },
-        { key: "nf30",     label: "NF 30D %" },
-        { key: "dipscore", label: "DIP SCORE" },
+    trending: [
+        { key: "rank",       label: "#",          width: 50 },
+        { key: "none",       label: "IMAGE",      width: 60 },
+        { key: "name",       label: "CARD NAME" },
+        { key: "set",        label: "SET" },
+        { key: "psa10",      label: "PSA 10" },
+        { key: "vel7d",      label: "7D \u0394" },
+        { key: "vel30d",     label: "30D \u0394" },
+        { key: "nfpct",      label: "NET FLOW %" },
+        { key: "satidx",     label: "SAT IDX" },
+        { key: "room",       label: "ROOM" },
+        { key: "trendscore", label: "SCORE \u25BC" },
     ],
     holds: [
         { key: "rank",     label: "#",         width: 50 },
@@ -1313,13 +1316,13 @@ const HEADERS = {
 function renderThead() {
     const thead = document.getElementById("card-thead");
     const cols =
-        view === "buythedip"   ? HEADERS.buythedip :
+        view === "trending"   ? HEADERS.trending :
         view === "holds"       ? HEADERS.holds :
         view === "mustbuy"     ? HEADERS.mustbuy :
         view === "topchase"    ? HEADERS.topchase :
         view === "demandsurge" ? HEADERS.demandsurge :
         view === "bestgrading" ? HEADERS.bestgrading :
-                                  HEADERS.buythedip;  // safe fallback
+                                  HEADERS.trending;  // safe fallback
     const tr = document.createElement("tr");
     for (const col of cols) {
         const th = document.createElement("th");
@@ -1340,25 +1343,24 @@ function renderThead() {
 
 // --- row rendering (per-view) ---
 
-function renderRowsBuyTheDip(list, start, count) {
+function renderRowsTrending(list, start, count) {
     const tbody = document.getElementById("card-tbody");
     if (start === 0) tbody.innerHTML = "";
     const end = Math.min(start + count, list.length);
     for (let i = start; i < end; i++) {
         const c = list[i];
-        const d = c._dipComps || {};
+        const d = c._trendComps || {};
         const imgUrl = esc(c["image-url"] || "");
         const cardId = c.id || "";
         const setCode = esc(c["set-code"] || "");
         const name    = esc(c["product-name"] || "\u2014");
         const psa10   = Number(c["psa-10-price"]) || 0;
-        const athVal  = Number(c["psa10-ath"]) || 0;
-        const athDate = c["psa10-ath-date"] || "\u2014";
-        const dipPct  = d.dipPct || 0;
-        const satIdx  = d.satIdx;
+        const vel7d   = d.vel7d;
+        const vel30d  = d.vel30d;
         const nf7Pct  = d.nf7Pct;
-        const nf30Pct = d.nf30Pct;
-        const score   = Number(c._dipScore);
+        const satIdx  = d.satIdx;
+        const roomScore = d.roomScore || 0;
+        const score   = Number(c._trendScore);
 
         const tr = document.createElement("tr");
         tr.className = "rowLink";
@@ -1367,44 +1369,45 @@ function renderRowsBuyTheDip(list, start, count) {
             if (!e.target.closest("a")) window.location = this.dataset.href;
         };
 
-        const dipPctStr = (dipPct * 100).toFixed(1) + "%";
-        const dipCls = dipPct >= 0.50 ? "mb-chip tier-strong"
-                     : dipPct >= 0.30 ? "mb-chip tier-solid"
-                                      : "mb-chip tier-weak";
-
-        const satStr = satIdx !== null ? satIdx.toFixed(2) : "\u2014";
-        const satCls = satIdx !== null && satIdx < 0.60 ? "ev-chip pos"
-                     : satIdx !== null && satIdx < 0.85 ? "ev-chip zero"
-                                                        : "ev-chip neg";
-
-        const fmtNf = (v) => {
-            if (v === null || !Number.isFinite(v)) return "\u2014";
+        const fmtPct = (v) => {
+            if (v === null || v === undefined || !Number.isFinite(v)) return "\u2014";
             return (v >= 0 ? "+" : "") + (v * 100).toFixed(1) + "%";
+        };
+        const velCls = (v) => {
+            if (v === null || !Number.isFinite(v)) return "chip chip-neu";
+            return v >= 0.15 ? "mb-chip tier-strong" : v >= 0.05 ? "mb-chip tier-solid" : "chip chip-pos";
         };
         const nfCls = (v) => {
             if (v === null || !Number.isFinite(v)) return "chip chip-neu";
             return v > 0.005 ? "chip chip-pos" : v < -0.005 ? "chip chip-neg" : "chip chip-neu";
         };
 
+        const satStr = satIdx !== null ? satIdx.toFixed(2) : "\u2014";
+        const satCls = satIdx !== null && satIdx < 0.60 ? "ev-chip pos"
+                     : satIdx !== null && satIdx < 0.85 ? "ev-chip zero"
+                                                        : "ev-chip neg";
+
+        const roomPct = (roomScore / 15 * 100).toFixed(0);
+        const roomCls = roomScore >= 10 ? "chip chip-pos" : roomScore >= 5 ? "chip chip-neu" : "chip chip-neg";
+
         const scoreCls =
             score >= 60 ? "mb-chip tier-strong" :
-            score >= 40 ? "mb-chip tier-solid"  :
+            score >= 35 ? "mb-chip tier-solid"  :
                           "mb-chip tier-weak";
 
-        // All values are escaped via esc() or are numeric. innerHTML pattern
-        // matches existing codebase (renderRowsMustBuy, renderRowsHolds, etc).
+        // All values are escaped via esc() or are numeric — matches existing
+        // codebase pattern (renderRowsMustBuy, renderRowsHolds, etc).
         tr.innerHTML = `
             <td class="text-center"><span class="${esc(rankClass(i + 1))}">${i + 1}</span></td>
             <td>${imgUrl ? `<img src="${esc(imgUrl)}" alt="" style="width:56px;height:78px;object-fit:contain;" loading="lazy">` : "\u2014"}</td>
             <td>${name}</td>
             <td>${setCode}</td>
             <td class="text-right text-mono">${money(psa10)}</td>
-            <td class="text-right text-mono" style="color:#606060;">${money(athVal)}</td>
-            <td class="text-right" style="font-size:10px;color:#808080;">${esc(athDate)}</td>
-            <td class="text-right"><span class="${esc(dipCls)}">${dipPctStr}</span></td>
+            <td class="text-right"><span class="${esc(velCls(vel7d))}">${fmtPct(vel7d)}</span></td>
+            <td class="text-right"><span class="${esc(velCls(vel30d))}">${fmtPct(vel30d)}</span></td>
+            <td class="text-right"><span class="${esc(nfCls(nf7Pct))}">${fmtPct(nf7Pct)}</span></td>
             <td class="text-right"><span class="${esc(satCls)}">${satStr}</span></td>
-            <td class="text-right"><span class="${esc(nfCls(nf7Pct))}">${fmtNf(nf7Pct)}</span></td>
-            <td class="text-right"><span class="${esc(nfCls(nf30Pct))}">${fmtNf(nf30Pct)}</span></td>
+            <td class="text-right"><span class="${esc(roomCls)}">${roomPct}%</span></td>
             <td class="text-right"><span class="${esc(scoreCls)}">${Number.isFinite(score) ? score : "\u2014"}</span></td>
         `;
         tbody.appendChild(tr);
@@ -1843,7 +1846,7 @@ function updateLoadMore(list) {
         c["net-flow-pct"] !== null && c["net-flow-pct"] !== undefined
     ).length;
 
-    const needsMarketData = (view === "buythedip" || view === "mustbuy" || view === "demandsurge" || view === "topchase");
+    const needsMarketData = (view === "trending" || view === "mustbuy" || view === "demandsurge" || view === "topchase");
     const poolNote = needsMarketData
         ? ` (of ${marketPoolSize} with market data)`
         : "";
@@ -1861,7 +1864,7 @@ function renderRows(list, start, count) {
             view === "demandsurge" ? HEADERS.demandsurge :
             view === "bestgrading" ? HEADERS.bestgrading :
                                       HEADERS.mustbuy;
-        const needsMarketData = (view === "buythedip" || view === "mustbuy" || view === "demandsurge" || view === "topchase");
+        const needsMarketData = (view === "trending" || view === "mustbuy" || view === "demandsurge" || view === "topchase");
         const hint = needsMarketData
             ? " This view requires eBay market-pressure data, which currently covers ~17% of the catalog — try loosening a threshold or check the Long-Term Holds / Best Grading tabs which don't need market data."
             : " Try loosening the price floor or relaxing a filter.";
@@ -1871,13 +1874,13 @@ function renderRows(list, start, count) {
         document.getElementById("status-count").textContent = `0 cards`;
         return;
     }
-    if (view === "buythedip")          renderRowsBuyTheDip(list, start, count);
+    if (view === "trending")          renderRowsTrending(list, start, count);
     else if (view === "holds")         renderRowsHolds(list, start, count);
     else if (view === "mustbuy")       renderRowsMustBuy(list, start, count);
     else if (view === "topchase")      renderRowsTopChase(list, start, count);
     else if (view === "demandsurge")   renderRowsDemandSurge(list, start, count);
     else if (view === "bestgrading")   renderRowsBestGrading(list, start, count);
-    else                                renderRowsBuyTheDip(list, start, count);
+    else                                renderRowsTrending(list, start, count);
 }
 
 // --- scatter map chart ---
@@ -2168,16 +2171,16 @@ function fullRender() {
         computeMustBuyScore(c);             // 6-dimension smart-investor composite
         computeBestGradingScore(c);         // simple % uplift for Best Grading Play
         computeTopChaseScoreEnriched(c);    // log(psa10) × demand × cultural for Top Chase
-        computeDipScore(c);                 // ATH dip + reversal signals for Buy the Dip
+        computeTrendScore(c);                 // price velocity + demand acceleration for Trending Now
     }
     let list;
-    if (view === "buythedip")          list = filterBuyTheDip();
+    if (view === "trending")          list = filterTrending();
     else if (view === "holds")         list = filterHolds();
     else if (view === "mustbuy")       list = filterMustBuy();
     else if (view === "topchase")      list = filterTopChase();
     else if (view === "demandsurge")   list = filterDemandSurge();
     else if (view === "bestgrading")   list = filterBestGrading();
-    else                                list = filterBuyTheDip();  // safe default
+    else                                list = filterTrending();  // safe default
 
     // Apply era filter on top of view filter
     if (currentEra !== "all") {
@@ -2228,13 +2231,13 @@ function wireToolbar() {
             view = btn.dataset.view;
 
             // Swap control groups
-            const dipCtrl   = document.querySelector(".opp-controls-buythedip");
+            const trendCtrl   = document.querySelector(".opp-controls-trending");
             const holdsCtrl = document.querySelector(".opp-controls-holds");
             const mbCtrl    = document.querySelector(".opp-controls-mustbuy");
             const tcCtrl    = document.querySelector(".opp-controls-topchase");
             const dsCtrl    = document.querySelector(".opp-controls-demandsurge");
             const bgCtrl    = document.querySelector(".opp-controls-bestgrading");
-            if (dipCtrl)   dipCtrl.style.display   = (view === "buythedip")  ? "flex" : "none";
+            if (trendCtrl)   trendCtrl.style.display   = (view === "trending")  ? "flex" : "none";
             if (holdsCtrl) holdsCtrl.style.display = (view === "holds")       ? "flex" : "none";
             if (mbCtrl)    mbCtrl.style.display    = (view === "mustbuy")     ? "flex" : "none";
             if (tcCtrl)    tcCtrl.style.display    = (view === "topchase")    ? "flex" : "none";
@@ -2242,7 +2245,7 @@ function wireToolbar() {
             if (bgCtrl)    bgCtrl.style.display    = (view === "bestgrading") ? "flex" : "none";
 
             // Reset sort to view's sensible default
-            if (view === "buythedip")         currentSort = { key: "dipscore",   dir: "desc" };
+            if (view === "trending")         currentSort = { key: "trendscore", dir: "desc" };
             else if (view === "holds")        currentSort = { key: "score",      dir: "desc" };
             else if (view === "mustbuy")      currentSort = Object.keys(modelProjections).length > 0
                                                              ? { key: "proj", dir: "desc" }
@@ -2250,7 +2253,7 @@ function wireToolbar() {
             else if (view === "topchase")     currentSort = { key: "chasescore", dir: "desc" };
             else if (view === "demandsurge")  currentSort = { key: "ratio",      dir: "desc" };
             else if (view === "bestgrading")  currentSort = { key: "roi",        dir: "desc" };
-            else                               currentSort = { key: "dipscore",  dir: "desc" };
+            else                               currentSort = { key: "trendscore", dir: "desc" };
 
             fullRender();
         });
@@ -2267,30 +2270,21 @@ function wireToolbar() {
         });
     }
 
-    // -- Buy the Dip controls --
-    const dipPsa10Input = document.getElementById("dip-min-psa10");
-    if (dipPsa10Input) {
-        dipPsa10Input.addEventListener("input", (e) => {
+    // -- Trending Now controls --
+    const trendPsa10Input = document.getElementById("trend-min-psa10");
+    if (trendPsa10Input) {
+        trendPsa10Input.addEventListener("input", (e) => {
             const v = Number(e.target.value);
-            if (Number.isFinite(v) && v >= 0) { dipMinPsa10 = v; if (view === "buythedip") fullRender(); }
+            if (Number.isFinite(v) && v >= 0) { trendMinPsa10 = v; if (view === "trending") fullRender(); }
         });
     }
-    const dipDipPctSlider = document.getElementById("dip-min-dippct");
-    const dipDipPctVal = document.getElementById("dip-min-dippct-val");
-    if (dipDipPctSlider) {
-        dipDipPctSlider.addEventListener("input", () => {
-            dipMinDipPct = Number(dipDipPctSlider.value);
-            if (dipDipPctVal) dipDipPctVal.textContent = (dipMinDipPct * 100).toFixed(0) + "%";
-            if (view === "buythedip") fullRender();
-        });
-    }
-    const dipScoreSlider = document.getElementById("dip-min-score");
-    const dipScoreVal = document.getElementById("dip-min-score-val");
-    if (dipScoreSlider) {
-        dipScoreSlider.addEventListener("input", () => {
-            dipMinScore = Number(dipScoreSlider.value);
-            if (dipScoreVal) dipScoreVal.textContent = String(dipMinScore);
-            if (view === "buythedip") fullRender();
+    const trendScoreSlider = document.getElementById("trend-min-score");
+    const trendScoreVal = document.getElementById("trend-min-score-val");
+    if (trendScoreSlider) {
+        trendScoreSlider.addEventListener("input", () => {
+            trendMinScore = Number(trendScoreSlider.value);
+            if (trendScoreVal) trendScoreVal.textContent = String(trendMinScore);
+            if (view === "trending") fullRender();
         });
     }
 
