@@ -7,14 +7,26 @@ sed -i 's/^/export /' /etc/environment.sh
 
 # Setup cron
 cat > /etc/cron.d/deltadex << 'CRONTAB'
+# Heartbeat — proves cron is alive
+*/5 * * * * root date >> /tmp/logs/cron_heartbeat.log 2>&1
+# eBay signal universe (2x/day: early morning + midday UTC)
 15 0 * * * root /app/cron-run.sh -m scripts.populate_ebay_signal_universe >> /tmp/logs/cron_ebay.log 2>&1
 0 10 * * * root /app/cron-run.sh -m scripts.populate_ebay_signal_universe >> /tmp/logs/cron_ebay.log 2>&1
+# Dip candidates
 30 10 * * * root /app/cron-run.sh -m scripts.populate_ebay_dip_candidates >> /tmp/logs/cron_ebay.log 2>&1
+# Daily pipeline (leaderboard, signals)
 0 11 * * * root /app/cron-run.sh -m pipeline.daily_pipeline >> /tmp/logs/cron_daily.log 2>&1
 
 CRONTAB
 chmod 0644 /etc/cron.d/deltadex
 cron
+echo "Cron daemon started, verifying..."
+sleep 1
+if ps aux | grep -v grep | grep cron > /dev/null 2>&1; then
+    echo "Cron daemon: RUNNING"
+else
+    echo "WARNING: Cron daemon failed to start!"
+fi
 
 # SQLite fallback
 if [ ! -f /app/data/pokemon.db ]; then

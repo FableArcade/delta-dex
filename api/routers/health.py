@@ -81,16 +81,19 @@ def cron_status():
 
     # Is cron running?
     try:
-        ps = subprocess.run(["pgrep", "-x", "cron"], capture_output=True, text=True, timeout=5)
-        cron_running = ps.returncode == 0
-        cron_pid = ps.stdout.strip() if cron_running else None
+        ps = subprocess.run(
+            ["ps", "aux"], capture_output=True, text=True, timeout=5
+        )
+        cron_lines = [l for l in ps.stdout.splitlines() if "cron" in l.lower() and "grep" not in l]
+        cron_running = len(cron_lines) > 0
+        cron_pid = cron_lines[0].split()[1] if cron_running else None
     except Exception as e:
         cron_running = None
         cron_pid = str(e)
 
     # Read recent cron logs
     logs = {}
-    for name in ["cron_ebay.log", "cron_daily.log"]:
+    for name in ["cron_ebay.log", "cron_daily.log", "cron_heartbeat.log"]:
         path = f"/tmp/logs/{name}"
         try:
             with open(path) as f:
