@@ -79,21 +79,35 @@ def cron_status():
     import subprocess
     import os
 
-    # Is cron running?
-    try:
-        ps = subprocess.run(
-            ["ps", "aux"], capture_output=True, text=True, timeout=5
-        )
-        cron_lines = [l for l in ps.stdout.splitlines() if "cron" in l.lower() and "grep" not in l]
-        cron_running = len(cron_lines) > 0
-        cron_pid = cron_lines[0].split()[1] if cron_running else None
-    except Exception as e:
-        cron_running = None
-        cron_pid = str(e)
+    # Is cron running? Try multiple detection methods.
+    cron_running = None
+    cron_pid = None
+    for pid_path in ["/var/run/crond.pid", "/run/crond.pid", "/var/run/cron.pid"]:
+        try:
+            with open(pid_path) as f:
+                cron_pid = f.read().strip()
+                # Check if process exists
+                os.kill(int(cron_pid), 0)
+                cron_running = True
+                break
+        except (FileNotFoundError, ValueError, ProcessLookupError, PermissionError):
+            continue
+    if cron_running is None:
+        # Fallback: check heartbeat recency
+        try:
+            with open("/tmp/logs/cron_heartbeat.log") as f:
+                lines = f.readlines()
+                if lines:
+                    last = lines[-1].strip()
+                    cron_running = True
+                    cron_pid = f"heartbeat-alive (last: {last})"
+        except FileNotFoundError:
+            cron_running = False
+            cron_pid = "no heartbeat, no PID file"
 
     # Read recent cron logs
     logs = {}
-    for name in ["cron_ebay.log", "cron_daily.log", "cron_heartbeat.log"]:
+    for name in ["cron_ebay.log", "cron_daily.log", "cron_heartbeat.log", "trigger_ebay.log", "trigger_signals.log"]:
         path = f"/tmp/logs/{name}"
         try:
             with open(path) as f:
@@ -124,16 +138,60 @@ def trigger_ebay():
     import threading
 
     def run():
-        subprocess.run(
+        result = subprocess.run(
             ["/usr/local/bin/python", "-m", "scripts.populate_ebay_signal_universe"],
             cwd="/app",
             capture_output=True,
+            text=True,
             timeout=1800,
         )
+        # Write output for debugging
+        with open("/tmp/logs/trigger_ebay.log", "w") as f:
+            f.write(f"returncode: {result.returncode}\n")
+            f.write(f"--- stdout ---\n{result.stdout[-3000:]}\n")
+            f.write(f"--- stderr ---\n{result.stderr[-3000:]}\n")
 
     t = threading.Thread(target=run, daemon=True)
     t.start()
-    return {"status": "started", "message": "eBay collection running in background. Check /api/health freshness in ~10 min."}
+    return {"status": "started", "message": "eBay collection running in background. Check /api/cron_status logs in ~10 min."}
+
+
+@router.post("/trigger_signals")
+def trigger_signals():
+    """Recompute market_pressure + supply_saturation from existing eBay data. No API keys needed."""
+    import threading
+
+    def run():
+        try:
+            from db.connection import get_db
+            from pipeline.compute.market_pressure import compute_market_pressure
+
+            with get_db() as db:
+                all_ids = [r["card_id"] for r in db.execute(
+                    "SELECT DISTINCT card_id FROM ebay_history"
+                ).fetchall()]
+
+            ok, failed = 0, 0
+            with get_db() as db:
+                for i, cid in enumerate(all_ids):
+                    try:
+                        compute_market_pressure(db, cid)
+                        ok += 1
+                    except Exception:
+                        failed += 1
+                    if (i + 1) % 200 == 0:
+                        with open("/tmp/logs/trigger_signals.log", "w") as f:
+                            f.write(f"Progress: {i+1}/{len(all_ids)} ok={ok} failed={failed}\n")
+
+            with open("/tmp/logs/trigger_signals.log", "w") as f:
+                f.write(f"Done: {ok} ok, {failed} failed out of {len(all_ids)}\n")
+        except Exception as e:
+            with open("/tmp/logs/trigger_signals.log", "w") as f:
+                f.write(f"ERROR: {e}\n")
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    return {"status": "started", "cards": "all with ebay data", "message": "Signal recompute running. Check /api/cron_status logs."}
 
 
 @router.get("/db_debug")
