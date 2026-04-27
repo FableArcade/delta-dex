@@ -73,6 +73,66 @@ def health(db=Depends(get_db_conn)):
         },
     }
 
+@router.get("/cron_status")
+def cron_status():
+    """Check if cron daemon is running and show recent log output."""
+    import subprocess
+    import os
+
+    # Is cron running?
+    try:
+        ps = subprocess.run(["pgrep", "-x", "cron"], capture_output=True, text=True, timeout=5)
+        cron_running = ps.returncode == 0
+        cron_pid = ps.stdout.strip() if cron_running else None
+    except Exception as e:
+        cron_running = None
+        cron_pid = str(e)
+
+    # Read recent cron logs
+    logs = {}
+    for name in ["cron_ebay.log", "cron_daily.log"]:
+        path = f"/tmp/logs/{name}"
+        try:
+            with open(path) as f:
+                lines = f.readlines()
+                logs[name] = "".join(lines[-30:])  # last 30 lines
+        except FileNotFoundError:
+            logs[name] = "file not found"
+
+    # Check crontab
+    try:
+        ct = subprocess.run(["cat", "/etc/cron.d/deltadex"], capture_output=True, text=True, timeout=5)
+        crontab = ct.stdout
+    except Exception as e:
+        crontab = str(e)
+
+    return {
+        "cron_running": cron_running,
+        "cron_pid": cron_pid,
+        "crontab": crontab,
+        "logs": logs,
+    }
+
+
+@router.post("/trigger_ebay")
+def trigger_ebay():
+    """Manually trigger eBay signal universe collection in background."""
+    import subprocess
+    import threading
+
+    def run():
+        subprocess.run(
+            ["/usr/local/bin/python", "-m", "scripts.populate_ebay_signal_universe"],
+            cwd="/app",
+            capture_output=True,
+            timeout=1800,
+        )
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    return {"status": "started", "message": "eBay collection running in background. Check /api/health freshness in ~10 min."}
+
+
 @router.get("/db_debug")
 def db_debug():
     import os
