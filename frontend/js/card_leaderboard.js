@@ -86,7 +86,7 @@ let minHoldPrice = 200;
 // Sealed lacks per-card market_pressure, so it gets a softer rule (the hold
 // score itself + a positive momentum check is enough — sealed has implicit
 // brand floor since every chase product is iconic in its own right).
-const HOLDS_MIN_CULTURAL = 0.20;       // higher than Must Buy's 0.10
+const HOLDS_MIN_CULTURAL = 0.05;       // low bar — momentum + discount are the real signals
 const HOLDS_MIN_HOLD_SCORE = 0.05;     // 5% — keeps flat cards out
 const HOLDS_MIN_MOMENTUM   = 0.03;     // 3% real appreciation over anchor window
 // Sealed gets a softer but non-trivial score gate. Sealed lacks per-card
@@ -1012,20 +1012,25 @@ function filterHolds() {
             const cultural = culturalImpactScore(c);
             if (cultural < HOLDS_MIN_CULTURAL) continue;
 
-            // Demand sentiment: at least one of the net-flow windows must be
-            // positive (after API negation, positive nf = inventory absorbed
-            // = bullish). We accept either window so a card with a strong 30d
-            // accumulation but a noisy 7d still qualifies, and vice versa.
+            // Demand sentiment: if market data exists, bearish flow is a
+            // negative signal but not a hard gate. Only 8% of cards have eBay
+            // data — excluding the other 92% would defeat the tab's purpose.
+            // Cards WITH market data that show bearish flow get deprioritized
+            // by the hold score itself (which incorporates flow).
             const nf7  = numOrNull(c["net-flow-7d"]);
             const nf30 = numOrNull(c["net-flow-30d"]);
-            const hasBullishFlow =
-                (nf30 !== null && nf30 > 0) ||
-                (nf7  !== null && nf7  > 0);
-            if (!hasBullishFlow) continue;
+            const hasMarketData = nf7 !== null || nf30 !== null;
+            if (hasMarketData) {
+                const hasBullishFlow =
+                    (nf30 !== null && nf30 > 0) ||
+                    (nf7  !== null && nf7  > 0);
+                // If we HAVE market data and it's bearish, skip.
+                if (!hasBullishFlow) continue;
 
-            // Supply must not be saturated.
-            const satIdx = numOrNull(c["supply-saturation-index"]);
-            if (satIdx !== null && satIdx >= 1) continue;
+                // Supply must not be saturated.
+                const satIdx = numOrNull(c["supply-saturation-index"]);
+                if (satIdx !== null && satIdx >= 1) continue;
+            }
         }
 
         out.push(c);

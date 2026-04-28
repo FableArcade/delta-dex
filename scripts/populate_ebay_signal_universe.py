@@ -51,6 +51,12 @@ def _signal_universe_ids(today: str) -> tuple[set[str], int]:
                 SELECT DISTINCT card_id FROM market_pressure WHERE mode='observed'
                 UNION
                 SELECT DISTINCT card_id FROM ebay_history
+                UNION
+                SELECT DISTINCT c.id FROM cards c
+                JOIN price_history ph ON ph.card_id = c.id
+                WHERE c.sealed_product = 'N'
+                  AND ph.psa_10_price >= 50
+                  AND ph.date = (SELECT MAX(date) FROM price_history WHERE card_id = c.id)
                 """
             ).fetchall()
         }
