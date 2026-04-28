@@ -151,8 +151,19 @@ def upsert_card(db, api_card: dict, set_code: str) -> None:
 
 
 def main() -> int:
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--sets", help="Comma-separated pokemontcg.io set IDs to seed (default: all)")
+    args = parser.parse_args()
+
+    target_set_ids = set(args.sets.split(",")) if args.sets else None
+
     logger.info("Fetching all sets from pokemontcg.io...")
     api_sets = fetch_all_sets()
+
+    if target_set_ids:
+        api_sets = [s for s in api_sets if s["id"] in target_set_ids]
+        logger.info("Filtered to %d target sets: %s", len(api_sets), target_set_ids)
 
     with get_db() as db:
         existing_sets = {r["set_code"] for r in db.execute("SELECT set_code FROM sets").fetchall()}
