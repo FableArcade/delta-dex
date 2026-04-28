@@ -132,16 +132,19 @@ def cron_status():
 
 
 @router.post("/trigger_price_scrape")
-def trigger_price_scrape():
-    """Scrape PriceCharting prices for cards missing price data. Resumes from where it left off."""
+def trigger_price_scrape(set_code: str = ""):
+    """Scrape PriceCharting prices for cards missing price data. Optionally filter by set_code."""
     import threading
 
     def run():
         try:
             import subprocess
+            cmd = ["/usr/local/bin/python", "-m", "scripts.bootstrap_pc_history_and_images",
+                   "--resume"]
+            if set_code:
+                cmd.extend(["--set-code", set_code])
             result = subprocess.run(
-                ["/usr/local/bin/python", "-m", "scripts.bootstrap_pc_history_and_images",
-                 "--resume"],
+                cmd,
                 cwd="/app",
                 capture_output=True,
                 text=True,
@@ -157,7 +160,7 @@ def trigger_price_scrape():
 
     t = threading.Thread(target=run, daemon=True)
     t.start()
-    return {"status": "started", "message": "Price scrape running with --resume. Check /api/cron_status logs for trigger_price_scrape.log."}
+    return {"status": "started", "set_code": set_code or "all", "message": "Price scrape running with --resume. Check /api/cron_status logs for trigger_price_scrape.log."}
 
 
 @router.post("/trigger_seed_sets")

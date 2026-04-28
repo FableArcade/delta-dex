@@ -414,6 +414,7 @@ def _load_cards(
     limit: Optional[int],
     card_id: Optional[str],
     shard: Optional[tuple[int, int]] = None,
+    set_code: Optional[str] = None,
 ) -> list[dict]:
     where = ["c.sealed_product = 'N'"]
     params: list[Any] = []
@@ -421,6 +422,9 @@ def _load_cards(
         where = ["c.id = ?"]
         params = [card_id]
     else:
+        if set_code:
+            where.append("c.set_code = ?")
+            params.append(set_code)
         if blank_images:
             where.append("(c.image_url IS NULL OR c.image_url = '')")
         if resume:
@@ -458,6 +462,7 @@ def run(
     force_image: bool = False,
     dry_run: bool = False,
     shard: Optional[tuple[int, int]] = None,
+    set_code: Optional[str] = None,
 ) -> dict[str, int]:
     cards = _load_cards(
         blank_images=blank_images,
@@ -465,6 +470,7 @@ def run(
         limit=limit,
         card_id=card_id,
         shard=shard,
+        set_code=set_code,
     )
     shard_label = f" shard={shard[0]}/{shard[1]}" if shard else ""
     logger.info(
@@ -577,6 +583,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--shard", type=str, default=None,
                    help="Shard selector 'N/M' — process only cards where rowid % M == N. "
                         "Use to run multiple workers in parallel without overlap.")
+    p.add_argument("--set-code", type=str, default=None,
+                   help="Only process cards in this set_code (e.g. 'PROMO').")
     p.add_argument("--verbose", "-v", action="store_true",
                    help="Debug logging.")
     return p
@@ -607,6 +615,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         force_image=args.force_image,
         dry_run=args.dry_run,
         shard=shard,
+        set_code=args.set_code,
     )
     print(json.dumps(summary, indent=2))
     if summary["errors"] > summary["processed"] // 4 and summary["processed"] > 0:
