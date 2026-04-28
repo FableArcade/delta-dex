@@ -107,7 +107,7 @@ def cron_status():
 
     # Read recent cron logs
     logs = {}
-    for name in ["cron_ebay.log", "cron_daily.log", "cron_heartbeat.log", "trigger_ebay.log", "trigger_signals.log", "trigger_seed.log"]:
+    for name in ["cron_ebay.log", "cron_daily.log", "cron_heartbeat.log", "trigger_ebay.log", "trigger_signals.log", "trigger_seed.log", "trigger_price_scrape.log"]:
         path = f"/tmp/logs/{name}"
         try:
             with open(path) as f:
@@ -129,6 +129,35 @@ def cron_status():
         "crontab": crontab,
         "logs": logs,
     }
+
+
+@router.post("/trigger_price_scrape")
+def trigger_price_scrape():
+    """Scrape PriceCharting prices for cards missing price data. Resumes from where it left off."""
+    import threading
+
+    def run():
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["/usr/local/bin/python", "-m", "scripts.bootstrap_pc_history_and_images",
+                 "--resume"],
+                cwd="/app",
+                capture_output=True,
+                text=True,
+                timeout=3600,
+            )
+            with open("/tmp/logs/trigger_price_scrape.log", "w") as f:
+                f.write(f"returncode: {result.returncode}\n")
+                f.write(f"--- stdout (last 5000) ---\n{result.stdout[-5000:]}\n")
+                f.write(f"--- stderr (last 3000) ---\n{result.stderr[-3000:]}\n")
+        except Exception as e:
+            with open("/tmp/logs/trigger_price_scrape.log", "w") as f:
+                f.write(f"ERROR: {e}\n")
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    return {"status": "started", "message": "Price scrape running with --resume. Check /api/cron_status logs for trigger_price_scrape.log."}
 
 
 @router.post("/trigger_seed_sets")
