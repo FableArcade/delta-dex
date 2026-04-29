@@ -132,19 +132,22 @@ def cron_status():
 
 
 @router.post("/trigger_daily_pipeline")
-def trigger_daily_pipeline():
-    """Run the full daily pipeline (prices, leaderboard, signals)."""
+def trigger_daily_pipeline(stage: str = "all"):
+    """Run the daily pipeline. stage='all' (default), 'scrape', or 'compute'."""
     import threading
 
     def run():
         try:
             import subprocess
+            cmd = ["/usr/local/bin/python", "-m", "pipeline.daily_pipeline"]
+            if stage != "all":
+                cmd.extend(["--stage", stage])
             result = subprocess.run(
-                ["/usr/local/bin/python", "-m", "pipeline.daily_pipeline"],
+                cmd,
                 cwd="/app",
                 capture_output=True,
                 text=True,
-                timeout=3600,
+                timeout=7200,
             )
             with open("/tmp/logs/trigger_daily_pipeline.log", "w") as f:
                 f.write(f"returncode: {result.returncode}\n")
