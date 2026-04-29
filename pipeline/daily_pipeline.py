@@ -156,17 +156,36 @@ class DailyPipeline:
             logger.info("[DRY RUN] would insert pipeline_runs row for stage=%s", stage_label)
             self.run_id = -1
             return
+        import os
+        is_pg = bool(os.environ.get("DATABASE_URL", "").startswith("postgres"))
         with get_db() as db:
-            cur = db.execute(
-                "INSERT INTO pipeline_runs (started_at, status, stage, notes) "
-                "VALUES (?, 'running', ?, ?)",
-                (
-                    dt.datetime.utcnow().isoformat(timespec="seconds"),
-                    stage_label,
-                    f"date={self.date}",
-                ),
-            )
-            self.run_id = cur.lastrowid
+            if is_pg:
+                # Fix sequence if out of sync, then use RETURNING id
+                db.execute(
+                    "SELECT setval('pipeline_runs_id_seq', "
+                    "COALESCE((SELECT MAX(id) FROM pipeline_runs), 0) + 1, false)"
+                )
+                row = db.execute(
+                    "INSERT INTO pipeline_runs (started_at, status, stage, notes) "
+                    "VALUES (%s, 'running', %s, %s) RETURNING id",
+                    (
+                        dt.datetime.utcnow().isoformat(timespec="seconds"),
+                        stage_label,
+                        f"date={self.date}",
+                    ),
+                ).fetchone()
+                self.run_id = row["id"] if row else None
+            else:
+                cur = db.execute(
+                    "INSERT INTO pipeline_runs (started_at, status, stage, notes) "
+                    "VALUES (?, 'running', ?, ?)",
+                    (
+                        dt.datetime.utcnow().isoformat(timespec="seconds"),
+                        stage_label,
+                        f"date={self.date}",
+                    ),
+                )
+                self.run_id = cur.lastrowid
         logger.info("pipeline_runs row created: id=%s stage=%s date=%s",
                     self.run_id, stage_label, self.date)
 
@@ -190,7 +209,14 @@ class DailyPipeline:
             return
         # Use scraper_completion_json column if it exists (see scripts/migrate_ops_columns.py).
         with get_db() as db:
-            cols = {r["name"] for r in db.execute("PRAGMA table_info(pipeline_runs)").fetchall()}
+            import os as _os
+            if _os.environ.get("DATABASE_URL", "").startswith("postgres"):
+                cols = {r["column_name"] for r in db.execute(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'pipeline_runs'"
+                ).fetchall()}
+            else:
+                cols = {r["name"] for r in db.execute("PRAGMA table_info(pipeline_runs)").fetchall()}
             if "scraper_completion_json" in cols:
                 db.execute(
                     """UPDATE pipeline_runs

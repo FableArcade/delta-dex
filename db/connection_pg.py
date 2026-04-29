@@ -70,29 +70,29 @@ class PgCursorWrapper:
             pass  # leave as-is, conflict handled above
         # Convert SQLite datetime('now') to Postgres NOW()
         sql = sql.replace("datetime('now')", "NOW()")
-        sql = sql.replace("date('now')", "CURRENT_DATE")
-        sql = sql.replace("date('now', 'localtime')", "CURRENT_DATE")
+        sql = sql.replace("date('now')", "CURRENT_DATE::text")
+        sql = sql.replace("date('now', 'localtime')", "CURRENT_DATE::text")
         # Convert SQLite date('now', '-N days') to Postgres
         import re
         sql = re.sub(
             r"date\('now',\s*'(-?\d+)\s*days?'\s*(?:,\s*'localtime')?\)",
-            r"CURRENT_DATE + INTERVAL '\1 days'",
+            r"(CURRENT_DATE + INTERVAL '\1 days')::date::text",
             sql
         )
         sql = re.sub(
             r"date\('now',\s*'-(\d+)\s*days?'\s*(?:,\s*'localtime')?\)",
-            r"CURRENT_DATE - INTERVAL '\1 days'",
+            r"(CURRENT_DATE - INTERVAL '\1 days')::date::text",
             sql
         )
         # Convert SQLite date(col, '-N days') to Postgres
         sql = re.sub(
             r"date\((\w+),\s*'(-?\d+)\s*days?'\)",
-            r"(\1::date + INTERVAL '\2 days')",
+            r"((\1::date + INTERVAL '\2 days')::date::text)",
             sql
         )
         sql = re.sub(
             r"date\((\w+\.?\w*),\s*'-(\d+)\s*days?'\)",
-            r"(\1::date - INTERVAL '\2 days')",
+            r"((\1::date - INTERVAL '\2 days')::date::text)",
             sql
         )
         # IFNULL → COALESCE
