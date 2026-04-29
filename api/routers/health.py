@@ -107,7 +107,7 @@ def cron_status():
 
     # Read recent cron logs
     logs = {}
-    for name in ["cron_ebay.log", "cron_daily.log", "cron_heartbeat.log", "trigger_ebay.log", "trigger_signals.log", "trigger_seed.log", "trigger_price_scrape.log"]:
+    for name in ["cron_ebay.log", "cron_daily.log", "cron_heartbeat.log", "trigger_ebay.log", "trigger_signals.log", "trigger_seed.log", "trigger_price_scrape.log", "trigger_daily_pipeline.log"]:
         path = f"/tmp/logs/{name}"
         try:
             with open(path) as f:
@@ -129,6 +129,34 @@ def cron_status():
         "crontab": crontab,
         "logs": logs,
     }
+
+
+@router.post("/trigger_daily_pipeline")
+def trigger_daily_pipeline():
+    """Run the full daily pipeline (prices, leaderboard, signals)."""
+    import threading
+
+    def run():
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["/usr/local/bin/python", "-m", "pipeline.daily_pipeline"],
+                cwd="/app",
+                capture_output=True,
+                text=True,
+                timeout=3600,
+            )
+            with open("/tmp/logs/trigger_daily_pipeline.log", "w") as f:
+                f.write(f"returncode: {result.returncode}\n")
+                f.write(f"--- stdout (last 5000) ---\n{result.stdout[-5000:]}\n")
+                f.write(f"--- stderr (last 3000) ---\n{result.stderr[-3000:]}\n")
+        except Exception as e:
+            with open("/tmp/logs/trigger_daily_pipeline.log", "w") as f:
+                f.write(f"ERROR: {e}\n")
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    return {"status": "started", "message": "Daily pipeline running. Check /api/cron_status for trigger_daily_pipeline.log."}
 
 
 @router.post("/trigger_price_scrape")
