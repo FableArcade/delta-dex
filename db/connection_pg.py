@@ -59,7 +59,19 @@ class PgCursorWrapper:
                 table = m.group(1)
                 cols = [c.strip() for c in m.group(2).split(",")]
                 # Assume first column is the primary key for conflict
-                conflict_cols = "card_id, window_days, mode, as_of" if table == "market_pressure" else "card_id, mode, as_of" if table == "supply_saturation" else cols[0]
+                # Map table names to their primary key columns for ON CONFLICT
+                _pk_map = {
+                    "market_pressure": "card_id, window_days, mode, as_of",
+                    "supply_saturation": "card_id, mode, as_of",
+                    "leaderboard": "set_code, date",
+                    "pack_cost": "set_code, date",
+                    "set_rarity_snapshot": "set_rarity, date",
+                    "price_history": "card_id, date",
+                    "ebay_history": "card_id, date",
+                    "psa_pop_history": "card_id, date",
+                    "set_daily": "set_code, date",
+                }
+                conflict_cols = _pk_map.get(table, cols[0])
                 updates = ", ".join(f"{c} = EXCLUDED.{c}" for c in cols[1:])
                 sql = sql.replace("INSERT OR REPLACE INTO", "INSERT INTO")
                 sql = sql.rstrip().rstrip(";")
