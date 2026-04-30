@@ -136,12 +136,18 @@ def trigger_daily_pipeline(stage: str = "all"):
     """Run the daily pipeline. stage='all' (default), 'scrape', or 'compute'."""
     import threading
 
+    # Write immediately so we can see the log exists
+    with open("/tmp/logs/trigger_daily_pipeline.log", "w") as f:
+        f.write(f"starting pipeline stage={stage}...\n")
+
     def run():
+        import subprocess
         try:
-            import subprocess
             cmd = ["/usr/local/bin/python", "-m", "pipeline.daily_pipeline"]
             if stage != "all":
                 cmd.extend(["--stage", stage])
+            with open("/tmp/logs/trigger_daily_pipeline.log", "a") as f:
+                f.write(f"cmd: {cmd}\n")
             result = subprocess.run(
                 cmd,
                 cwd="/app",
@@ -149,17 +155,18 @@ def trigger_daily_pipeline(stage: str = "all"):
                 text=True,
                 timeout=7200,
             )
-            with open("/tmp/logs/trigger_daily_pipeline.log", "w") as f:
+            with open("/tmp/logs/trigger_daily_pipeline.log", "a") as f:
                 f.write(f"returncode: {result.returncode}\n")
                 f.write(f"--- stdout (last 5000) ---\n{result.stdout[-5000:]}\n")
                 f.write(f"--- stderr (last 3000) ---\n{result.stderr[-3000:]}\n")
         except Exception as e:
-            with open("/tmp/logs/trigger_daily_pipeline.log", "w") as f:
-                f.write(f"ERROR: {e}\n")
+            import traceback
+            with open("/tmp/logs/trigger_daily_pipeline.log", "a") as f:
+                f.write(f"EXCEPTION: {e}\n{traceback.format_exc()}\n")
 
     t = threading.Thread(target=run, daemon=True)
     t.start()
-    return {"status": "started", "message": "Daily pipeline running. Check /api/cron_status for trigger_daily_pipeline.log."}
+    return {"status": "started", "stage": stage, "message": "Daily pipeline running. Check /api/cron_status for trigger_daily_pipeline.log."}
 
 
 @router.post("/trigger_price_scrape")
