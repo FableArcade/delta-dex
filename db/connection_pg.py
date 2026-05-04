@@ -54,7 +54,7 @@ class PgCursorWrapper:
         import re as _re
         if "INSERT OR REPLACE INTO" in sql:
             # Extract table name and columns
-            m = _re.match(r"INSERT OR REPLACE INTO\s+(\w+)\s*\(([^)]+)\)", sql, _re.I | _re.S)
+            m = _re.search(r"INSERT OR REPLACE INTO\s+(\w+)\s*\(([^)]+)\)", sql, _re.I | _re.S)
             if m:
                 table = m.group(1)
                 cols = [c.strip() for c in m.group(2).split(",")]
