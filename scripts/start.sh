@@ -17,8 +17,8 @@ cat > /etc/cron.d/deltadex << 'CRONTAB'
 0 16 * * * root /app/cron-run.sh -m scripts.populate_ebay_signal_universe >> /tmp/logs/cron_ebay.log 2>&1
 # Dip candidates (after eBay collection)
 30 8 * * * root /app/cron-run.sh -m scripts.populate_ebay_dip_candidates >> /tmp/logs/cron_ebay.log 2>&1
-# Price scrape (PriceCharting bootstrap — fills missing prices)
-0 6 * * * root /app/cron-run.sh -m scripts.bootstrap_pc_history_and_images --resume >> /tmp/logs/cron_prices.log 2>&1
+# Price scrape — daily PriceCharting refresh for all cards with known URLs
+0 6 * * * root /app/cron-run.sh -m pipeline.scrapers.pricecharting_scraper >> /tmp/logs/cron_prices.log 2>&1
 # Daily pipeline: compute stage only (leaderboard, EV, market pressure)
 # Scrape stage is too slow for cron — price scrape runs separately above
 0 9 * * * root /app/cron-run.sh -m pipeline.daily_pipeline --stage compute >> /tmp/logs/cron_daily.log 2>&1

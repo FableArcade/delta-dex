@@ -170,35 +170,37 @@ def trigger_daily_pipeline(stage: str = "all"):
 
 
 @router.post("/trigger_price_scrape")
-def trigger_price_scrape(set_code: str = ""):
-    """Scrape PriceCharting prices for cards missing price data. Optionally filter by set_code."""
+def trigger_price_scrape(limit: int = 0):
+    """Scrape fresh prices from PriceCharting for all cards. Optional limit for testing."""
     import threading
 
     def run():
         try:
             import subprocess
-            cmd = ["/usr/local/bin/python", "-m", "scripts.bootstrap_pc_history_and_images",
-                   "--resume"]
-            if set_code:
-                cmd.extend(["--set-code", set_code])
+            cmd = ["/usr/local/bin/python", "-m", "pipeline.scrapers.pricecharting_scraper"]
+            if limit > 0:
+                cmd.extend(["--limit", str(limit)])
+            with open("/tmp/logs/trigger_price_scrape.log", "w") as f:
+                f.write(f"starting price scrape... cmd={cmd}\n")
             result = subprocess.run(
                 cmd,
                 cwd="/app",
                 capture_output=True,
                 text=True,
-                timeout=3600,
+                timeout=7200,
             )
-            with open("/tmp/logs/trigger_price_scrape.log", "w") as f:
+            with open("/tmp/logs/trigger_price_scrape.log", "a") as f:
                 f.write(f"returncode: {result.returncode}\n")
                 f.write(f"--- stdout (last 5000) ---\n{result.stdout[-5000:]}\n")
                 f.write(f"--- stderr (last 3000) ---\n{result.stderr[-3000:]}\n")
         except Exception as e:
-            with open("/tmp/logs/trigger_price_scrape.log", "w") as f:
-                f.write(f"ERROR: {e}\n")
+            import traceback
+            with open("/tmp/logs/trigger_price_scrape.log", "a") as f:
+                f.write(f"EXCEPTION: {e}\n{traceback.format_exc()}\n")
 
     t = threading.Thread(target=run, daemon=True)
     t.start()
-    return {"status": "started", "set_code": set_code or "all", "message": "Price scrape running with --resume. Check /api/cron_status logs for trigger_price_scrape.log."}
+    return {"status": "started", "limit": limit or "all", "message": "PriceCharting scrape running. Check /api/cron_status for trigger_price_scrape.log."}
 
 
 @router.post("/trigger_seed_sets")
