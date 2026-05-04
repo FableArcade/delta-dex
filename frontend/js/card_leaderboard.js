@@ -852,6 +852,8 @@ function filterBestGrading() {
 
 function filterDemandSurge() {
     const hasProj = Object.keys(modelProjections).length > 0;
+    const numOrNull = (v) => (v === null || v === undefined || v === "") ? null : Number(v);
+    const clamp01 = v => Math.max(0, Math.min(1, v));
     const out = [];
     for (const c of allCards) {
         if (c["is-sealed"]) continue;
@@ -869,7 +871,37 @@ function filterDemandSurge() {
         if (!Number.isFinite(dem) || !Number.isFinite(sup) || sup <= 0) continue;
         if (dem / sup < dsMinRatio) continue;
 
-        // Attach projection data
+        // --- Composite buy score (supply squeeze + entry timing) ---
+        const ratio = dem / sup;
+
+        // 1. Squeeze strength (40 pts) — how much demand exceeds supply
+        const squeezeScore = clamp01((ratio - 1.0) / 0.5) * 40;
+
+        // 2. Discount from ATH (30 pts) — room to run
+        const ath = numOrNull(c["psa10-ath"]);
+        let discountScore = 0;
+        let discountPct = 0;
+        if (ath !== null && ath > 0 && psa10 < ath) {
+            discountPct = (ath - psa10) / ath;
+            discountScore = clamp01(discountPct / 0.50) * 30;
+        }
+
+        // 3. Price recovering (20 pts) — just turned the corner
+        const p30 = numOrNull(c["psa10-30d-ago"]);
+        let recoveryScore = 0;
+        let vel7d = null;
+        if (p30 !== null && p30 > 0) {
+            vel7d = (psa10 - p30) / p30;
+            if (vel7d > 0) recoveryScore = clamp01(vel7d / 0.20) * 20;
+        }
+
+        // 4. Flow intensity (10 pts) — how fast inventory is draining
+        const flowScore = clamp01(nfPct / 0.04) * 10;
+
+        const buyScore = Math.round(squeezeScore + discountScore + recoveryScore + flowScore);
+        c._dsBuyScore = buyScore;
+        c._dsComps = { ratio, discountPct, vel7d, nfPct, squeezeScore, discountScore, recoveryScore, flowScore };
+
         if (hasProj) {
             const proj = modelProjections[c.id];
             c._projReturn = proj ? proj["projected-return"] : null;
@@ -1153,21 +1185,17 @@ function getSortValueBestGrading(card, key) {
 }
 
 function getSortValueDemandSurge(card, key) {
+    const d = card._dsComps || {};
     switch (key) {
-        case "name":     return (card["product-name"] || "").toLowerCase();
-        case "set":      return (card["set-code"] || "").toLowerCase();
-        case "psa10":    return Number(card["psa-10-price"]) || 0;
-        case "proj":     return Number.isFinite(card._projReturn) ? card._projReturn : -Infinity;
-        case "demand":   return Number(card["demand-pressure"]) || 0;
-        case "supply":   return Number(card["supply-pressure"]) || 0;
-        case "ratio":    {
-            const d = Number(card["demand-pressure"]);
-            const s = Number(card["supply-pressure"]);
-            if (!Number.isFinite(d) || !Number.isFinite(s) || s <= 0) return 0;
-            return d / s;
-        }
-        case "nfpct":    return Number.isFinite(Number(card["net-flow-pct"])) ? Number(card["net-flow-pct"]) : -Infinity;
-        default:          return 0;
+        case "name":      return (card["product-name"] || "").toLowerCase();
+        case "set":       return (card["set-code"] || "").toLowerCase();
+        case "psa10":     return Number(card["psa-10-price"]) || 0;
+        case "buyscore":  return Number.isFinite(card._dsBuyScore) ? card._dsBuyScore : -Infinity;
+        case "ratio":     return d.ratio || 0;
+        case "discount":  return d.discountPct || 0;
+        case "recovery":  return d.vel7d !== null ? d.vel7d : -Infinity;
+        case "nfpct":     return Number.isFinite(Number(card["net-flow-pct"])) ? Number(card["net-flow-pct"]) : -Infinity;
+        default:           return 0;
     }
 }
 
@@ -1293,16 +1321,16 @@ const HEADERS = {
         { key: "chasescore", label: "CHASE" },
     ],
     demandsurge: [
-        { key: "rank",    label: "#",         width: 50 },
-        { key: "none",    label: "IMAGE",     width: 60 },
-        { key: "name",    label: "CARD NAME" },
-        { key: "set",     label: "SET" },
-        { key: "psa10",   label: "PSA 10" },
-        { key: "ratio",   label: "D/S RATIO" },
-        { key: "nfpct",   label: "NET FLOW %" },
-        { key: "proj",    label: "90D PROJ" },
-        { key: "demand",  label: "DEMAND" },
-        { key: "supply",  label: "SUPPLY" },
+        { key: "rank",      label: "#",         width: 50 },
+        { key: "none",      label: "IMAGE",     width: 60 },
+        { key: "name",      label: "CARD NAME" },
+        { key: "set",       label: "SET" },
+        { key: "psa10",     label: "PSA 10" },
+        { key: "buyscore",  label: "BUY SCORE \u25BC" },
+        { key: "ratio",     label: "D/S" },
+        { key: "discount",  label: "OFF ATH" },
+        { key: "recovery",  label: "30D \u0394" },
+        { key: "nfpct",     label: "FLOW %" },
     ],
     bestgrading: [
         { key: "rank",   label: "#",         width: 50 },
@@ -1485,16 +1513,17 @@ function renderRowsDemandSurge(list, start, count) {
     const end = Math.min(start + count, list.length);
     for (let i = start; i < end; i++) {
         const c = list[i];
+        const d = c._dsComps || {};
         const imgUrl = esc(c["image-url"] || "");
         const cardId = c.id || "";
         const setCode = esc(c["set-code"] || "");
         const name    = esc(c["product-name"] || "\u2014");
         const psa10Price = Number(c["psa-10-price"]) || 0;
-        const demand = Number(c["demand-pressure"]);
-        const supply = Number(c["supply-pressure"]);
-        const ratio = (Number.isFinite(demand) && Number.isFinite(supply) && supply > 0) ? demand / supply : null;
-        const nfPct = Number(c["net-flow-pct"]);
-        const { projHtml: dsProjHtml } = projChipHtml(cardId);
+        const buyScore = c._dsBuyScore || 0;
+        const ratio = d.ratio || 0;
+        const discountPct = d.discountPct || 0;
+        const vel7d = d.vel7d;
+        const nfPct = d.nfPct || 0;
 
         const tr = document.createElement("tr");
         tr.className = "rowLink";
@@ -1503,32 +1532,33 @@ function renderRowsDemandSurge(list, start, count) {
             if (!e.target.closest("a")) window.location = this.dataset.href;
         };
 
-        const demandStr = Number.isFinite(demand) ? demand.toFixed(3) : "\u2014";
-        const supplyStr = Number.isFinite(supply) ? supply.toFixed(3) : "\u2014";
-        const ratioStr = Number.isFinite(ratio) ? ratio.toFixed(2) + "\u00d7" : "\u2014";
-        const nfPctStr = Number.isFinite(nfPct)
-            ? (nfPct >= 0 ? "+" : "") + (nfPct * 100).toFixed(1) + "%"
-            : "\u2014";
-        const nfCls = Number.isFinite(nfPct) && nfPct > 0.02 ? "chip chip-pos"
-                    : Number.isFinite(nfPct) && nfPct < -0.02 ? "chip chip-neg"
-                    : "chip chip-neu";
-        const ratioCls =
-            (Number.isFinite(ratio) && ratio >= 3) ? "mb-chip tier-strong" :
-            (Number.isFinite(ratio) && ratio >= 2) ? "mb-chip tier-solid"  :
-                                                     "mb-chip tier-weak";
+        const scoreCls = buyScore >= 60 ? "mb-chip tier-strong"
+                       : buyScore >= 35 ? "mb-chip tier-solid"
+                                        : "mb-chip tier-weak";
+        const ratioStr = ratio.toFixed(2) + "\u00d7";
+        const discountStr = discountPct > 0 ? "-" + (discountPct * 100).toFixed(0) + "%" : "ATH";
+        const discountCls = discountPct >= 0.30 ? "chip chip-pos"
+                          : discountPct >= 0.10 ? "chip chip-neu"
+                                                : "chip chip-neg";
+        const velStr = vel7d !== null ? (vel7d >= 0 ? "+" : "") + (vel7d * 100).toFixed(1) + "%" : "\u2014";
+        const velCls = vel7d !== null && vel7d > 0.05 ? "chip chip-pos"
+                     : vel7d !== null && vel7d > 0 ? "chip chip-neu"
+                                                   : "chip chip-neg";
+        const nfStr = (nfPct >= 0 ? "+" : "") + (nfPct * 100).toFixed(1) + "%";
+        const nfCls = nfPct > 0.02 ? "chip chip-pos" : "chip chip-neu";
 
-        // Note: all values are escaped or numeric. innerHTML pattern matches existing codebase.
+        // All values escaped or numeric. Pattern matches existing codebase.
         tr.innerHTML = `
             <td class="text-center"><span class="${esc(rankClass(i + 1))}">${i + 1}</span></td>
             <td>${imgUrl ? `<img src="${imgUrl}" alt="" style="width:56px;height:78px;object-fit:contain;" loading="lazy">` : "\u2014"}</td>
             <td>${name}</td>
             <td>${setCode}</td>
             <td class="text-right text-mono">${money(psa10Price)}</td>
-            <td class="text-right"><span class="${esc(ratioCls)}">${ratioStr}</span></td>
-            <td class="text-right"><span class="${esc(nfCls)}">${nfPctStr}</span></td>
-            <td class="text-right">${dsProjHtml}</td>
-            <td class="text-right text-mono">${demandStr}</td>
-            <td class="text-right text-mono">${supplyStr}</td>
+            <td class="text-right"><span class="${esc(scoreCls)}">${buyScore}</span></td>
+            <td class="text-right"><span class="mb-chip tier-weak">${ratioStr}</span></td>
+            <td class="text-right"><span class="${esc(discountCls)}">${discountStr}</span></td>
+            <td class="text-right"><span class="${esc(velCls)}">${velStr}</span></td>
+            <td class="text-right"><span class="${esc(nfCls)}">${nfStr}</span></td>
         `;
         tbody.appendChild(tr);
     }
@@ -2256,7 +2286,7 @@ function wireToolbar() {
                                                              ? { key: "proj", dir: "desc" }
                                                              : { key: "mbscore", dir: "desc" };
             else if (view === "topchase")     currentSort = { key: "chasescore", dir: "desc" };
-            else if (view === "demandsurge")  currentSort = { key: "ratio",      dir: "desc" };
+            else if (view === "demandsurge")  currentSort = { key: "buyscore",   dir: "desc" };
             else if (view === "bestgrading")  currentSort = { key: "roi",        dir: "desc" };
             else                               currentSort = { key: "trendscore", dir: "desc" };
 
