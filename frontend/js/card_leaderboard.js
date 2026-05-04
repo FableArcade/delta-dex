@@ -65,7 +65,7 @@ function cardEra(card) {
     return "unknown";
 }
 
-let view = "mustbuy";  // "mustbuy" | "trending" | "topchase" | "demandsurge" | "bestgrading" | "holds"
+let view = "mustbuy";  // "mustbuy" | "trending" | "reversal" | "demandsurge" | "bestgrading" | "holds"
 
 // Constants used by computeEvScore (which feeds into Must Buy Now's hard gates).
 // No UI to tweak these now — Must Buy Now uses fixed defaults so the score is
@@ -852,8 +852,6 @@ function filterBestGrading() {
 
 function filterDemandSurge() {
     const hasProj = Object.keys(modelProjections).length > 0;
-    const numOrNull = (v) => (v === null || v === undefined || v === "") ? null : Number(v);
-    const clamp01 = v => Math.max(0, Math.min(1, v));
     const out = [];
     for (const c of allCards) {
         if (c["is-sealed"]) continue;
@@ -870,37 +868,6 @@ function filterDemandSurge() {
         const sup = Number(c["supply-pressure"]);
         if (!Number.isFinite(dem) || !Number.isFinite(sup) || sup <= 0) continue;
         if (dem / sup < dsMinRatio) continue;
-
-        // --- Composite buy score (supply squeeze + entry timing) ---
-        const ratio = dem / sup;
-
-        // 1. Squeeze strength (40 pts) — how much demand exceeds supply
-        const squeezeScore = clamp01((ratio - 1.0) / 0.5) * 40;
-
-        // 2. Discount from ATH (30 pts) — room to run
-        const ath = numOrNull(c["psa10-ath"]);
-        let discountScore = 0;
-        let discountPct = 0;
-        if (ath !== null && ath > 0 && psa10 < ath) {
-            discountPct = (ath - psa10) / ath;
-            discountScore = clamp01(discountPct / 0.50) * 30;
-        }
-
-        // 3. Price recovering (20 pts) — just turned the corner
-        const p30 = numOrNull(c["psa10-30d-ago"]);
-        let recoveryScore = 0;
-        let vel7d = null;
-        if (p30 !== null && p30 > 0) {
-            vel7d = (psa10 - p30) / p30;
-            if (vel7d > 0) recoveryScore = clamp01(vel7d / 0.20) * 20;
-        }
-
-        // 4. Flow intensity (10 pts) — how fast inventory is draining
-        const flowScore = clamp01(nfPct / 0.04) * 10;
-
-        const buyScore = Math.round(squeezeScore + discountScore + recoveryScore + flowScore);
-        c._dsBuyScore = buyScore;
-        c._dsComps = { ratio, discountPct, vel7d, nfPct, squeezeScore, discountScore, recoveryScore, flowScore };
 
         if (hasProj) {
             const proj = modelProjections[c.id];
@@ -940,60 +907,82 @@ function filterMustBuy() {
     return out;
 }
 
-function filterTopChase() {
-    const hasProj = Object.keys(modelProjections).length > 0;
+function filterReversal() {
+    const numOrNull = (v) => (v === null || v === undefined || v === "") ? null : Number(v);
     const out = [];
     for (const c of allCards) {
         if (c["is-sealed"]) continue;
-        const psa10 = Number(c["psa-10-price"]);
-        if (!Number.isFinite(psa10) || psa10 < chaseMinPsa10) continue;
-        if (chaseMaxPsa10 != null && psa10 > chaseMaxPsa10) continue;
-        const nfPct = Number(c["net-flow-pct-30d"]);
-        if (Number.isFinite(nfPct) && nfPct < chaseMinDemand) continue;
-        // Attach projection data
-        if (hasProj) {
-            const proj = modelProjections[c.id];
-            c._projReturn = proj ? proj["projected-return"] : null;
-            c._confLow = proj ? proj["confidence-low"] : null;
-            c._confHigh = proj ? proj["confidence-high"] : null;
-            c._confWidth = proj ? proj["confidence-width"] : null;
-        }
+        if (!Number.isFinite(c._reversalScore) || c._reversalScore < 20) continue;
         out.push(c);
     }
     return out;
 }
 
 /**
- * Top Chase score — price tier × normalized demand × cultural moat.
+ * Early Reversal score — cards just bouncing off a bottom.
  *
- *   price_tier    = sqrt(psa10 / 100)         // $100 → 1.0, $400 → 2.0, $1600 → 4.0
- *   demand_boost  = 1 + clamp(nf30pct, 0, 0.04) × 25    // 1.0 → 2.0 at 4% drain
- *   cultural_boost = 1 + cultural × 0.8                  // 1.0 → 1.8 for iconic
+ * Finds cards that: dropped significantly from ATH, price JUST started
+ * rising (short-term up), still cheap vs peak (room to run), and volume
+ * is increasing (not a dead cat bounce).
  *
- *   chase_score = price_tier × demand_boost × cultural_boost
- *
- * Real-data calibration (Apr 2026):
- *   Across the catalog, max observed nf30_pct is ~4%, not 50%. Raw
- *   net_flow = avg_new - avg_ended is a daily rate, and dividing by
- *   active_pool gives a fraction that rarely exceeds 0.04 in practice
- *   (a 4% daily pool clearance rate). Clamping at 0.04 and scaling by 25
- *   gives demand a full 1x–2x contribution range at real values, instead
- *   of being dominated by the clamp and contributing ~1.00–1.08.
+ * Score = 30% discount from ATH + 25% confirmed bottom + 25% early
+ *         momentum + 20% volume/flow confirmation
  */
-function computeTopChaseScoreEnriched(card) {
-    if (card["is-sealed"]) { card._chaseScore = null; return; }
-    const psa10 = Number(card["psa-10-price"]);
-    if (!Number.isFinite(psa10) || psa10 <= 0) { card._chaseScore = null; return; }
+function computeReversalScore(card) {
+    card._reversalScore = null;
+    card._reversalComps = null;
+    if (card["is-sealed"]) return;
 
-    const priceTier = Math.sqrt(psa10 / 100);
+    const numOrNull = (v) => (v === null || v === undefined || v === "") ? null : Number(v);
+    const clamp01 = v => Math.max(0, Math.min(1, v));
 
-    const nfPct = Number(card["net-flow-pct-30d"]);
-    const nfClamped = Number.isFinite(nfPct) ? Math.max(0, Math.min(0.04, nfPct)) : 0;
-    const demandBoost = 1 + nfClamped * 25;  // 0.04 → 2.0
+    const psa10 = numOrNull(card["psa-10-price"]);
+    if (psa10 === null || psa10 < 30) return;
 
-    const culturalBoost = 1 + culturalImpactScore(card) * 0.8;
+    const ath = numOrNull(card["psa10-ath"]);
+    if (ath === null || ath <= 0) return;
 
-    card._chaseScore = priceTier * demandBoost * culturalBoost;
+    // Must be at least 15% off ATH (otherwise there's no dip to reverse from)
+    const discountPct = (ath - psa10) / ath;
+    if (discountPct < 0.15) return;
+
+    // Need price history to detect the turn
+    const p30 = numOrNull(card["psa10-30d-ago"]);
+    const min1y = numOrNull(card["psa10-min-1y"]);
+    if (p30 === null) return;
+
+    // Price must be rising (current > 30d ago) — the "just turned" signal
+    const vel30d = p30 > 0 ? (psa10 - p30) / p30 : 0;
+    if (vel30d <= 0) return;  // hard gate: must be going UP
+
+    // Confirmed bottom: current price must be meaningfully above 1yr min
+    // (if we're still AT the min, it's a falling knife, not a reversal)
+    const offBottom = min1y !== null && min1y > 0 ? (psa10 - min1y) / min1y : 0;
+    if (min1y !== null && psa10 <= min1y * 1.05) return;  // within 5% of floor = not confirmed
+
+    // 1. Discount from ATH (30 pts) — room to run
+    const discountScore = clamp01(discountPct / 0.60) * 30;
+
+    // 2. Confirmed bottom (25 pts) — how far above the 1yr low
+    const bottomScore = min1y !== null ? clamp01(offBottom / 0.30) * 25 : 10;
+
+    // 3. Early momentum (25 pts) — 30d velocity (small is fine, we want EARLY)
+    const momentumScore = clamp01(vel30d / 0.15) * 25;
+
+    // 4. Volume/flow confirmation (20 pts) — if market data exists
+    let flowScore = 10;  // default: neutral (no market data)
+    const nfPct = numOrNull(card["net-flow-pct"]);
+    const satIdx = numOrNull(card["supply-saturation-index"]);
+    if (nfPct !== null && nfPct > 0) {
+        flowScore = clamp01(nfPct / 0.02) * 15 + 5;
+    }
+    if (satIdx !== null && satIdx < 0.9) {
+        flowScore = Math.min(20, flowScore + 5);
+    }
+
+    const score = Math.round(discountScore + bottomScore + momentumScore + flowScore);
+    card._reversalScore = score;
+    card._reversalComps = { discountPct, vel30d, offBottom, nfPct, satIdx, ath, min1y };
 }
 
 function filterHolds() {
@@ -1185,17 +1174,20 @@ function getSortValueBestGrading(card, key) {
 }
 
 function getSortValueDemandSurge(card, key) {
-    const d = card._dsComps || {};
     switch (key) {
-        case "name":      return (card["product-name"] || "").toLowerCase();
-        case "set":       return (card["set-code"] || "").toLowerCase();
-        case "psa10":     return Number(card["psa-10-price"]) || 0;
-        case "buyscore":  return Number.isFinite(card._dsBuyScore) ? card._dsBuyScore : -Infinity;
-        case "ratio":     return d.ratio || 0;
-        case "discount":  return d.discountPct || 0;
-        case "recovery":  return d.vel7d !== null ? d.vel7d : -Infinity;
-        case "nfpct":     return Number.isFinite(Number(card["net-flow-pct"])) ? Number(card["net-flow-pct"]) : -Infinity;
-        default:           return 0;
+        case "name":     return (card["product-name"] || "").toLowerCase();
+        case "set":      return (card["set-code"] || "").toLowerCase();
+        case "psa10":    return Number(card["psa-10-price"]) || 0;
+        case "ratio":    {
+            const d = Number(card["demand-pressure"]);
+            const s = Number(card["supply-pressure"]);
+            if (!Number.isFinite(d) || !Number.isFinite(s) || s <= 0) return 0;
+            return d / s;
+        }
+        case "nfpct":    return Number.isFinite(Number(card["net-flow-pct"])) ? Number(card["net-flow-pct"]) : -Infinity;
+        case "demand":   return Number(card["demand-pressure"]) || 0;
+        case "supply":   return Number(card["supply-pressure"]) || 0;
+        default:          return 0;
     }
 }
 
@@ -1217,16 +1209,17 @@ function getSortValueMustBuy(card, key) {
     }
 }
 
-function getSortValueTopChase(card, key) {
+function getSortValueReversal(card, key) {
+    const d = card._reversalComps || {};
     switch (key) {
-        case "name":      return (card["product-name"] || "").toLowerCase();
-        case "set":       return (card["set-code"] || "").toLowerCase();
-        case "psa10":     return Number(card["psa-10-price"]) || 0;
-        case "proj":      return Number.isFinite(card._projReturn) ? card._projReturn : -Infinity;
-        case "cultural":  return culturalImpactScore(card);
-        case "nfpct":     return Number.isFinite(Number(card["net-flow-pct-30d"])) ? Number(card["net-flow-pct-30d"]) : -Infinity;
-        case "chasescore":return Number(card._chaseScore) || 0;
-        default:           return 0;
+        case "name":       return (card["product-name"] || "").toLowerCase();
+        case "set":        return (card["set-code"] || "").toLowerCase();
+        case "psa10":      return Number(card["psa-10-price"]) || 0;
+        case "discount":   return d.discountPct || 0;
+        case "vel30d":     return d.vel30d || -Infinity;
+        case "offbottom":  return d.offBottom || 0;
+        case "revscore":   return Number.isFinite(card._reversalScore) ? card._reversalScore : -Infinity;
+        default:            return 0;
     }
 }
 
@@ -1253,7 +1246,7 @@ function sortList(list) {
         view === "trending"   ? getSortValueTrend :
         view === "holds"       ? getSortValueHold :
         view === "mustbuy"     ? getSortValueMustBuy :
-        view === "topchase"    ? getSortValueTopChase :
+        view === "reversal"    ? getSortValueReversal :
         view === "demandsurge" ? getSortValueDemandSurge :
         view === "bestgrading" ? getSortValueBestGrading :
                                   getSortValueTrend;  // safe fallback
@@ -1309,28 +1302,27 @@ const HEADERS = {
         { key: "scarcity", label: "SCARCITY" },
         { key: "mbscore",  label: "SCORE" },
     ],
-    topchase: [
-        { key: "rank",       label: "#",          width: 50 },
-        { key: "none",       label: "IMAGE",      width: 60 },
-        { key: "name",       label: "CARD NAME" },
-        { key: "set",        label: "SET" },
-        { key: "psa10",      label: "PSA 10" },
-        { key: "proj",       label: "90D PROJ" },
-        { key: "cultural",   label: "CULTURE" },
-        { key: "nfpct",      label: "NET FLOW 30D %" },
-        { key: "chasescore", label: "CHASE" },
-    ],
-    demandsurge: [
-        { key: "rank",      label: "#",         width: 50 },
-        { key: "none",      label: "IMAGE",     width: 60 },
+    reversal: [
+        { key: "rank",      label: "#",          width: 50 },
+        { key: "none",      label: "IMAGE",      width: 60 },
         { key: "name",      label: "CARD NAME" },
         { key: "set",       label: "SET" },
         { key: "psa10",     label: "PSA 10" },
-        { key: "buyscore",  label: "BUY SCORE \u25BC" },
-        { key: "ratio",     label: "D/S" },
         { key: "discount",  label: "OFF ATH" },
-        { key: "recovery",  label: "30D \u0394" },
-        { key: "nfpct",     label: "FLOW %" },
+        { key: "vel30d",    label: "30D \u0394" },
+        { key: "offbottom", label: "OFF LOW" },
+        { key: "revscore",  label: "SCORE \u25BC" },
+    ],
+    demandsurge: [
+        { key: "rank",    label: "#",         width: 50 },
+        { key: "none",    label: "IMAGE",     width: 60 },
+        { key: "name",    label: "CARD NAME" },
+        { key: "set",     label: "SET" },
+        { key: "psa10",   label: "PSA 10" },
+        { key: "ratio",   label: "D/S RATIO \u25BC" },
+        { key: "nfpct",   label: "NET FLOW %" },
+        { key: "demand",  label: "DEMAND" },
+        { key: "supply",  label: "SUPPLY" },
     ],
     bestgrading: [
         { key: "rank",   label: "#",         width: 50 },
@@ -1352,7 +1344,7 @@ function renderThead() {
         view === "trending"   ? HEADERS.trending :
         view === "holds"       ? HEADERS.holds :
         view === "mustbuy"     ? HEADERS.mustbuy :
-        view === "topchase"    ? HEADERS.topchase :
+        view === "reversal"    ? HEADERS.reversal :
         view === "demandsurge" ? HEADERS.demandsurge :
         view === "bestgrading" ? HEADERS.bestgrading :
                                   HEADERS.trending;  // safe fallback
@@ -1513,17 +1505,15 @@ function renderRowsDemandSurge(list, start, count) {
     const end = Math.min(start + count, list.length);
     for (let i = start; i < end; i++) {
         const c = list[i];
-        const d = c._dsComps || {};
         const imgUrl = esc(c["image-url"] || "");
         const cardId = c.id || "";
         const setCode = esc(c["set-code"] || "");
         const name    = esc(c["product-name"] || "\u2014");
         const psa10Price = Number(c["psa-10-price"]) || 0;
-        const buyScore = c._dsBuyScore || 0;
-        const ratio = d.ratio || 0;
-        const discountPct = d.discountPct || 0;
-        const vel7d = d.vel7d;
-        const nfPct = d.nfPct || 0;
+        const demand = Number(c["demand-pressure"]);
+        const supply = Number(c["supply-pressure"]);
+        const ratio = (Number.isFinite(demand) && Number.isFinite(supply) && supply > 0) ? demand / supply : null;
+        const nfPct = Number(c["net-flow-pct"]);
 
         const tr = document.createElement("tr");
         tr.className = "rowLink";
@@ -1532,20 +1522,16 @@ function renderRowsDemandSurge(list, start, count) {
             if (!e.target.closest("a")) window.location = this.dataset.href;
         };
 
-        const scoreCls = buyScore >= 60 ? "mb-chip tier-strong"
-                       : buyScore >= 35 ? "mb-chip tier-solid"
-                                        : "mb-chip tier-weak";
-        const ratioStr = ratio.toFixed(2) + "\u00d7";
-        const discountStr = discountPct > 0 ? "-" + (discountPct * 100).toFixed(0) + "%" : "ATH";
-        const discountCls = discountPct >= 0.30 ? "chip chip-pos"
-                          : discountPct >= 0.10 ? "chip chip-neu"
-                                                : "chip chip-neg";
-        const velStr = vel7d !== null ? (vel7d >= 0 ? "+" : "") + (vel7d * 100).toFixed(1) + "%" : "\u2014";
-        const velCls = vel7d !== null && vel7d > 0.05 ? "chip chip-pos"
-                     : vel7d !== null && vel7d > 0 ? "chip chip-neu"
-                                                   : "chip chip-neg";
-        const nfStr = (nfPct >= 0 ? "+" : "") + (nfPct * 100).toFixed(1) + "%";
-        const nfCls = nfPct > 0.02 ? "chip chip-pos" : "chip chip-neu";
+        const ratioStr = Number.isFinite(ratio) ? ratio.toFixed(2) + "\u00d7" : "\u2014";
+        const ratioCls = (Number.isFinite(ratio) && ratio >= 1.3) ? "mb-chip tier-strong"
+                       : (Number.isFinite(ratio) && ratio >= 1.1) ? "mb-chip tier-solid"
+                                                                   : "mb-chip tier-weak";
+        const nfPctStr = Number.isFinite(nfPct) ? (nfPct >= 0 ? "+" : "") + (nfPct * 100).toFixed(1) + "%" : "\u2014";
+        const nfCls = Number.isFinite(nfPct) && nfPct > 0.02 ? "chip chip-pos"
+                    : Number.isFinite(nfPct) && nfPct < -0.02 ? "chip chip-neg"
+                    : "chip chip-neu";
+        const demandStr = Number.isFinite(demand) ? demand.toFixed(3) : "\u2014";
+        const supplyStr = Number.isFinite(supply) ? supply.toFixed(3) : "\u2014";
 
         // All values escaped or numeric. Pattern matches existing codebase.
         tr.innerHTML = `
@@ -1554,11 +1540,10 @@ function renderRowsDemandSurge(list, start, count) {
             <td>${name}</td>
             <td>${setCode}</td>
             <td class="text-right text-mono">${money(psa10Price)}</td>
-            <td class="text-right"><span class="${esc(scoreCls)}">${buyScore}</span></td>
-            <td class="text-right"><span class="mb-chip tier-weak">${ratioStr}</span></td>
-            <td class="text-right"><span class="${esc(discountCls)}">${discountStr}</span></td>
-            <td class="text-right"><span class="${esc(velCls)}">${velStr}</span></td>
-            <td class="text-right"><span class="${esc(nfCls)}">${nfStr}</span></td>
+            <td class="text-right"><span class="${esc(ratioCls)}">${ratioStr}</span></td>
+            <td class="text-right"><span class="${esc(nfCls)}">${nfPctStr}</span></td>
+            <td class="text-right text-mono">${demandStr}</td>
+            <td class="text-right text-mono">${supplyStr}</td>
         `;
         tbody.appendChild(tr);
     }
@@ -1566,28 +1551,22 @@ function renderRowsDemandSurge(list, start, count) {
     updateLoadMore(list);
 }
 
-/**
- * Build a per-card breakdown string for the Must Buy Now score, exposed via
- * the .mb-chip's `data-tip` attribute. Hovering shows exactly which signals
- * contributed how many points so the score is fully transparent.
- *
- * Reads c._mbComps which was populated by computeMustBuyScore().
- */
-function renderRowsTopChase(list, start, count) {
+function renderRowsReversal(list, start, count) {
     const tbody = document.getElementById("card-tbody");
     if (start === 0) tbody.innerHTML = "";
     const end = Math.min(start + count, list.length);
     for (let i = start; i < end; i++) {
         const c = list[i];
+        const d = c._reversalComps || {};
         const imgUrl = esc(c["image-url"] || "");
         const cardId = c.id || "";
         const setCode = esc(c["set-code"] || "");
         const name    = esc(c["product-name"] || "\u2014");
         const psa10 = Number(c["psa-10-price"]) || 0;
-        const cultural = culturalImpactScore(c);
-        const nfPct = Number(c["net-flow-pct-30d"]);
-        const score = Number(c._chaseScore);
-        const { projHtml: tcProjHtml } = projChipHtml(cardId);
+        const discountPct = d.discountPct || 0;
+        const vel30d = d.vel30d || 0;
+        const offBottom = d.offBottom || 0;
+        const score = c._reversalScore || 0;
 
         const tr = document.createElement("tr");
         tr.className = "rowLink";
@@ -1596,34 +1575,29 @@ function renderRowsTopChase(list, start, count) {
             if (!e.target.closest("a")) window.location = this.dataset.href;
         };
 
-        const culturalStr = (cultural * 100).toFixed(0) + "%";
-        const culturalCls =
-            cultural >= 0.75 ? "mb-chip tier-strong" :
-            cultural >= 0.45 ? "mb-chip tier-solid"  :
-                               "mb-chip tier-weak";
-        const nfStr = Number.isFinite(nfPct)
-            ? (nfPct >= 0 ? "+" : "") + (nfPct * 100).toFixed(1) + "%"
-            : "\u2014";
-        const nfCls = Number.isFinite(nfPct) && nfPct > 0.05 ? "chip chip-pos" :
-                     Number.isFinite(nfPct) && nfPct > 0     ? "chip chip-neu" :
-                                                               "chip chip-neg";
-        const tierCls =
-            Number.isFinite(score) && score >= 8 ? "mb-chip tier-strong" :
-            Number.isFinite(score) && score >= 4 ? "mb-chip tier-solid"  :
-                                                    "mb-chip tier-weak";
-        const scoreStr = Number.isFinite(score) ? score.toFixed(2) : "\u2014";
+        const discountStr = "-" + (discountPct * 100).toFixed(0) + "%";
+        const discountCls = discountPct >= 0.40 ? "mb-chip tier-strong"
+                          : discountPct >= 0.25 ? "mb-chip tier-solid"
+                                                : "mb-chip tier-weak";
+        const velStr = "+" + (vel30d * 100).toFixed(1) + "%";
+        const velCls = vel30d >= 0.10 ? "chip chip-pos" : "chip chip-neu";
+        const bottomStr = "+" + (offBottom * 100).toFixed(0) + "%";
+        const bottomCls = offBottom >= 0.20 ? "chip chip-pos" : offBottom >= 0.10 ? "chip chip-neu" : "chip chip-neg";
+        const scoreCls = score >= 60 ? "mb-chip tier-strong"
+                       : score >= 40 ? "mb-chip tier-solid"
+                                     : "mb-chip tier-weak";
 
-        // Note: all values are escaped or numeric. innerHTML pattern matches existing codebase.
+        // All values escaped or numeric.
         tr.innerHTML = `
             <td class="text-center"><span class="${esc(rankClass(i + 1))}">${i + 1}</span></td>
             <td>${imgUrl ? `<img src="${imgUrl}" alt="" style="width:56px;height:78px;object-fit:contain;" loading="lazy">` : "\u2014"}</td>
             <td>${name}</td>
             <td>${setCode}</td>
             <td class="text-right text-mono">${money(psa10)}</td>
-            <td class="text-right">${tcProjHtml}</td>
-            <td class="text-right"><span class="${esc(culturalCls)}">${culturalStr}</span></td>
-            <td class="text-right"><span class="${esc(nfCls)}">${nfStr}</span></td>
-            <td class="text-right"><span class="${esc(tierCls)}">${scoreStr}</span></td>
+            <td class="text-right"><span class="${esc(discountCls)}">${discountStr}</span></td>
+            <td class="text-right"><span class="${esc(velCls)}">${velStr}</span></td>
+            <td class="text-right"><span class="${esc(bottomCls)}">${bottomStr}</span></td>
+            <td class="text-right"><span class="${esc(scoreCls)}">${score}</span></td>
         `;
         tbody.appendChild(tr);
     }
@@ -1881,7 +1855,7 @@ function updateLoadMore(list) {
         c["net-flow-pct"] !== null && c["net-flow-pct"] !== undefined
     ).length;
 
-    const needsMarketData = (view === "trending" || view === "mustbuy" || view === "demandsurge" || view === "topchase");
+    const needsMarketData = (view === "trending" || view === "mustbuy" || view === "demandsurge" || view === "reversal");
     const poolNote = needsMarketData
         ? ` (of ${marketPoolSize} with market data)`
         : "";
@@ -1899,7 +1873,7 @@ function renderRows(list, start, count) {
             view === "demandsurge" ? HEADERS.demandsurge :
             view === "bestgrading" ? HEADERS.bestgrading :
                                       HEADERS.mustbuy;
-        const needsMarketData = (view === "trending" || view === "mustbuy" || view === "demandsurge" || view === "topchase");
+        const needsMarketData = (view === "trending" || view === "mustbuy" || view === "demandsurge" || view === "reversal");
         const hint = needsMarketData
             ? " This view requires eBay market-pressure data, which currently covers ~17% of the catalog — try loosening a threshold or check the Long-Term Holds / Best Grading tabs which don't need market data."
             : " Try loosening the price floor or relaxing a filter.";
@@ -1912,7 +1886,7 @@ function renderRows(list, start, count) {
     if (view === "trending")          renderRowsTrending(list, start, count);
     else if (view === "holds")         renderRowsHolds(list, start, count);
     else if (view === "mustbuy")       renderRowsMustBuy(list, start, count);
-    else if (view === "topchase")      renderRowsTopChase(list, start, count);
+    else if (view === "reversal")      renderRowsReversal(list, start, count);
     else if (view === "demandsurge")   renderRowsDemandSurge(list, start, count);
     else if (view === "bestgrading")   renderRowsBestGrading(list, start, count);
     else                                renderRowsTrending(list, start, count);
@@ -1953,7 +1927,7 @@ function renderDistributionChart(list) {
 
     const isHolds       = (view === "holds");
     const isMustBuy     = (view === "mustbuy");
-    const isTopChase    = (view === "topchase");
+    const isTopChase    = (view === "reversal");
     const isDemandSurge = (view === "demandsurge");
     const isBestGrading = (view === "bestgrading");
 
@@ -2205,14 +2179,14 @@ function fullRender() {
         computeHoldScore(c);                // feeds Long-Term Holds
         computeMustBuyScore(c);             // 6-dimension smart-investor composite
         computeBestGradingScore(c);         // simple % uplift for Best Grading Play
-        computeTopChaseScoreEnriched(c);    // log(psa10) × demand × cultural for Top Chase
+        computeReversalScore(c);    // discount from ATH + confirmed bottom + early momentum
         computeTrendScore(c);                 // price velocity + demand acceleration for Trending Now
     }
     let list;
     if (view === "trending")          list = filterTrending();
     else if (view === "holds")         list = filterHolds();
     else if (view === "mustbuy")       list = filterMustBuy();
-    else if (view === "topchase")      list = filterTopChase();
+    else if (view === "reversal")      list = filterReversal();
     else if (view === "demandsurge")   list = filterDemandSurge();
     else if (view === "bestgrading")   list = filterBestGrading();
     else                                list = filterTrending();  // safe default
@@ -2269,13 +2243,13 @@ function wireToolbar() {
             const trendCtrl   = document.querySelector(".opp-controls-trending");
             const holdsCtrl = document.querySelector(".opp-controls-holds");
             const mbCtrl    = document.querySelector(".opp-controls-mustbuy");
-            const tcCtrl    = document.querySelector(".opp-controls-topchase");
+            const revCtrl    = document.querySelector(".opp-controls-reversal");
             const dsCtrl    = document.querySelector(".opp-controls-demandsurge");
             const bgCtrl    = document.querySelector(".opp-controls-bestgrading");
             if (trendCtrl)   trendCtrl.style.display   = (view === "trending")  ? "flex" : "none";
             if (holdsCtrl) holdsCtrl.style.display = (view === "holds")       ? "flex" : "none";
             if (mbCtrl)    mbCtrl.style.display    = (view === "mustbuy")     ? "flex" : "none";
-            if (tcCtrl)    tcCtrl.style.display    = (view === "topchase")    ? "flex" : "none";
+            if (revCtrl)    revCtrl.style.display    = (view === "reversal")    ? "flex" : "none";
             if (dsCtrl)    dsCtrl.style.display    = (view === "demandsurge") ? "flex" : "none";
             if (bgCtrl)    bgCtrl.style.display    = (view === "bestgrading") ? "flex" : "none";
 
@@ -2285,8 +2259,8 @@ function wireToolbar() {
             else if (view === "mustbuy")      currentSort = Object.keys(modelProjections).length > 0
                                                              ? { key: "proj", dir: "desc" }
                                                              : { key: "mbscore", dir: "desc" };
-            else if (view === "topchase")     currentSort = { key: "chasescore", dir: "desc" };
-            else if (view === "demandsurge")  currentSort = { key: "buyscore",   dir: "desc" };
+            else if (view === "reversal")     currentSort = { key: "revscore",   dir: "desc" };
+            else if (view === "demandsurge")  currentSort = { key: "ratio",      dir: "desc" };
             else if (view === "bestgrading")  currentSort = { key: "roi",        dir: "desc" };
             else                               currentSort = { key: "trendscore", dir: "desc" };
 
@@ -2328,7 +2302,7 @@ function wireToolbar() {
     if (tcMinPsa10Input) {
         tcMinPsa10Input.addEventListener("input", (e) => {
             const v = Number(e.target.value);
-            if (Number.isFinite(v) && v >= 0) { chaseMinPsa10 = v; if (view === "topchase") fullRender(); }
+            if (Number.isFinite(v) && v >= 0) { chaseMinPsa10 = v; if (view === "reversal") fullRender(); }
         });
     }
     const tcMaxPsa10Input = document.getElementById("topchase-max-psa10");
@@ -2340,7 +2314,7 @@ function wireToolbar() {
                 const v = Number(raw);
                 if (Number.isFinite(v) && v >= 0) chaseMaxPsa10 = v;
             }
-            if (view === "topchase") fullRender();
+            if (view === "reversal") fullRender();
         });
     }
 

@@ -47,12 +47,12 @@
         .opp-tab.holds.active        { color: #003388; }
         .opp-tab.trending.active     { color: #804000; background: #fff0d8; }
         .opp-tab.mustbuy.active      { color: #806000; background: #fff6d8; }
-        .opp-tab.topchase.active     { color: #800040; background: #ffe4f0; }
+        .opp-tab.reversal.active     { color: #006040; background: #e0fff0; }
         .opp-tab.demandsurge.active  { color: #004080; background: #e4f0ff; }
         .opp-tab.bestgrading.active  { color: #006400; background: #e8ffe8; }
         .opp-tab.trending,
         .opp-tab.mustbuy,
-        .opp-tab.topchase,
+        .opp-tab.reversal,
         .opp-tab.demandsurge,
         .opp-tab.bestgrading         { font-weight: bold; }
 
@@ -352,7 +352,7 @@
             .opp-controls-holds,
             .opp-controls-mustbuy,
             .opp-controls-trending,
-            .opp-controls-topchase,
+            .opp-controls-reversal,
             .opp-controls-demandsurge,
             .opp-controls-bestgrading,
             .opp-controls-sentiment {
@@ -441,14 +441,12 @@
             table.win-table[data-view="mustbuy"] thead th:nth-child(10),
             table.win-table[data-view="mustbuy"] tbody td:nth-child(10) { display: none; }
 
-            /* Top Chase (9 cols): keep PSA10(5), CHASE(9)
-               Hide: PROJ(6), CULTURE(7), NF30D(8) */
-            table.win-table[data-view="topchase"] thead th:nth-child(6),
-            table.win-table[data-view="topchase"] tbody td:nth-child(6),
-            table.win-table[data-view="topchase"] thead th:nth-child(7),
-            table.win-table[data-view="topchase"] tbody td:nth-child(7),
-            table.win-table[data-view="topchase"] thead th:nth-child(8),
-            table.win-table[data-view="topchase"] tbody td:nth-child(8) { display: none; }
+            /* Early Reversal (9 cols): #(1) IMG(2) NAME(3) SET(4) PSA10(5) OFF_ATH(6) 30D(7) OFF_LOW(8) SCORE(9)
+               Mobile: keep PSA10(5), OFF_ATH(6), SCORE(9). Hide: 30D(7), OFF_LOW(8) */
+            table.win-table[data-view="reversal"] thead th:nth-child(7),
+            table.win-table[data-view="reversal"] tbody td:nth-child(7),
+            table.win-table[data-view="reversal"] thead th:nth-child(8),
+            table.win-table[data-view="reversal"] tbody td:nth-child(8) { display: none; }
 
             /* Demand Surge (10 cols): keep PSA10(5), D/S RATIO(6), NF%(7)
                Hide: PROJ(8), DEMAND(9), SUPPLY(10) */
@@ -562,7 +560,7 @@
             <div class="opp-tabs">
                 <button class="opp-tab mustbuy active"    data-view="mustbuy"><span class="tab-full">&#9889; Top Picks</span><span class="tab-short">&#9889; Picks</span></button>
                 <button class="opp-tab trending"         data-view="trending"><span class="tab-full">&#128293; Trending Now</span><span class="tab-short">&#128293; Hot</span></button>
-                <button class="opp-tab topchase"          data-view="topchase"><span class="tab-full">&#128293; Top Chase</span><span class="tab-short">&#128293; Chase</span></button>
+                <button class="opp-tab reversal"          data-view="reversal"><span class="tab-full">&#8635; Early Reversal</span><span class="tab-short">&#8635; Reversal</span></button>
                 <button class="opp-tab demandsurge"       data-view="demandsurge"><span class="tab-full">&#128200; Demand Surge</span><span class="tab-short">&#128200; Surge</span></button>
                 <button class="opp-tab bestgrading"       data-view="bestgrading"><span class="tab-full">&#128142; Best Grading Play</span><span class="tab-short">&#128142; Grade</span></button>
                 <button class="opp-tab holds"             data-view="holds"><span class="tab-full">Long-Term Holds</span><span class="tab-short">Holds</span></button>
@@ -584,8 +582,8 @@
                     <input type="range" id="ds-min-ratio" min="1.0" max="1.5" step="0.05" value="1.05">
                     <span id="ds-min-ratio-val" style="font-weight:bold;min-width:42px;text-align:right;">1.05×</span>
                 </div>
-                <span class="opp-philosophy">Supply squeeze + value entry: cards being absorbed AND at a good buy price</span>
-                <span class="opp-formula-note">Buy Score = 40% squeeze strength + 30% discount from ATH + 20% price recovering + 10% flow intensity. Gated on: net flow ≥ 1%, sat &lt; 1, D/S ≥ 1.05×.</span>
+                <span class="opp-philosophy">Supply squeeze: cards being absorbed faster than listed</span>
+                <span class="opp-formula-note">Gated on: daily net flow ≥ 1% of pool, supply saturation &lt; 1, demand/supply ratio ≥ 1.05×. Ranked by D/S ratio.</span>
             </div>
 
             <!-- Controls specific to Best Grading Play view -->
@@ -628,18 +626,10 @@
                 <span class="opp-formula-note">Score = 15% culture + 25% demand (normalized net flow %) + 25% real scarcity (pop + supply tightness + 12mo price stability) + 15% momentum + 20% grading (real EV, not ratio) &middot; cards with no cultural moat, no market data, or saturated supply are excluded</span>
             </div>
 
-            <!-- Controls specific to Top Chase view -->
-            <div class="opp-controls-topchase" style="display:none;">
-                <div class="opp-control" title="Minimum PSA 10 price for chase tier. Lower = bigger list. Default $200.">
-                    <label for="topchase-min-psa10">Min PSA 10 $</label>
-                    <input type="number" id="topchase-min-psa10" min="0" max="20000" step="25" value="200">
-                </div>
-                <div class="opp-control" title="Maximum PSA 10 price — caps the universe so the ultra-premium grails don't crowd out affordable chases. Leave blank for no cap.">
-                    <label for="topchase-max-psa10">Max PSA 10 $</label>
-                    <input type="number" id="topchase-max-psa10" min="0" max="100000" step="100" placeholder="no cap">
-                </div>
-                <span class="opp-philosophy">Grail tracker: expensive cards with active demand</span>
-                <span class="opp-formula-note">Chase = <code>√(psa10/100) × (1 + nf30% × 2) × (1 + cultural × 0.8)</code>. Rewards expensive grails, normalized demand, and iconic names (no listing-count bias).</span>
+            <!-- Controls specific to Early Reversal view -->
+            <div class="opp-controls-reversal" style="display:none;">
+                <span class="opp-philosophy">Bottom fishing: cards just bouncing off lows with confirmed momentum</span>
+                <span class="opp-formula-note">Score = 30% discount from ATH + 25% confirmed bottom (above 1yr low) + 25% early momentum (30d rising) + 20% volume confirmation. Gated: ≥15% off ATH, price rising, above floor.</span>
             </div>
 
             <!-- Controls specific to Long-Term Holds view -->
