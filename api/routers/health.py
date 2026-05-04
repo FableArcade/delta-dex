@@ -107,7 +107,7 @@ def cron_status():
 
     # Read recent cron logs
     logs = {}
-    for name in ["cron_ebay.log", "cron_daily.log", "cron_heartbeat.log", "trigger_ebay.log", "trigger_signals.log", "trigger_seed.log", "trigger_price_scrape.log", "trigger_daily_pipeline.log"]:
+    for name in ["cron_ebay.log", "cron_daily.log", "cron_prices.log", "cron_heartbeat.log", "trigger_ebay.log", "trigger_signals.log", "trigger_seed.log", "trigger_price_scrape.log", "trigger_daily_pipeline.log"]:
         path = f"/tmp/logs/{name}"
         try:
             with open(path) as f:

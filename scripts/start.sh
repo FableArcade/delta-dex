@@ -9,13 +9,20 @@ sed -i 's/^/export /' /etc/environment.sh
 cat > /etc/cron.d/deltadex << 'CRONTAB'
 # Heartbeat — proves cron is alive
 */5 * * * * root date >> /tmp/logs/cron_heartbeat.log 2>&1
-# eBay signal universe (2x/day: early morning + midday UTC)
+# Log rotation — keep logs under 500 lines so they don't fill memory
+0 */6 * * * root for f in /tmp/logs/cron_*.log; do tail -500 "$f" > "$f.tmp" && mv "$f.tmp" "$f"; done 2>/dev/null
+# eBay signal universe (3x/day for fresh listing data)
 15 0 * * * root /app/cron-run.sh -m scripts.populate_ebay_signal_universe >> /tmp/logs/cron_ebay.log 2>&1
-0 10 * * * root /app/cron-run.sh -m scripts.populate_ebay_signal_universe >> /tmp/logs/cron_ebay.log 2>&1
-# Dip candidates
-30 10 * * * root /app/cron-run.sh -m scripts.populate_ebay_dip_candidates >> /tmp/logs/cron_ebay.log 2>&1
-# Daily pipeline (leaderboard, signals)
-0 11 * * * root /app/cron-run.sh -m pipeline.daily_pipeline >> /tmp/logs/cron_daily.log 2>&1
+0 8 * * * root /app/cron-run.sh -m scripts.populate_ebay_signal_universe >> /tmp/logs/cron_ebay.log 2>&1
+0 16 * * * root /app/cron-run.sh -m scripts.populate_ebay_signal_universe >> /tmp/logs/cron_ebay.log 2>&1
+# Dip candidates (after eBay collection)
+30 8 * * * root /app/cron-run.sh -m scripts.populate_ebay_dip_candidates >> /tmp/logs/cron_ebay.log 2>&1
+# Price scrape (PriceCharting bootstrap — fills missing prices)
+0 6 * * * root /app/cron-run.sh -m scripts.bootstrap_pc_history_and_images --resume >> /tmp/logs/cron_prices.log 2>&1
+# Daily pipeline: compute stage only (leaderboard, EV, market pressure)
+# Scrape stage is too slow for cron — price scrape runs separately above
+0 9 * * * root /app/cron-run.sh -m pipeline.daily_pipeline --stage compute >> /tmp/logs/cron_daily.log 2>&1
+0 17 * * * root /app/cron-run.sh -m pipeline.daily_pipeline --stage compute >> /tmp/logs/cron_daily.log 2>&1
 
 CRONTAB
 chmod 0644 /etc/cron.d/deltadex
@@ -37,6 +44,7 @@ if [ ! -f /app/data/pokemon.db ]; then
 fi
 
 echo "DB: DATABASE_URL=${DATABASE_URL:+SET}${DATABASE_URL:-NOT SET}"
-python3 -c "import os; print('PYTHON sees DATABASE_URL:', 'YES' if os.environ.get('DATABASE_URL') else 'NO')"
+echo "EBAY: EBAY_APP_ID=${EBAY_APP_ID:+SET}${EBAY_APP_ID:-NOT SET}"
+python3 -c "import os; print('PYTHON sees DATABASE_URL:', 'YES' if os.environ.get('DATABASE_URL') else 'NO'); print('PYTHON sees EBAY_APP_ID:', 'YES' if os.environ.get('EBAY_APP_ID') else 'NO — eBay collection will FAIL')"
 
 exec uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-7860}
