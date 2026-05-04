@@ -313,5 +313,7 @@ def db_debug2():
     return {
         "DATABASE_URL_set": bool(url),
         "DATABASE_URL_starts_with": url[:40] if url else "EMPTY/NONE",
-        "all_db_vars": {k: v[:20] for k, v in os.environ.items() if "DATABASE" in k or "PG" in k},
+        "EBAY_APP_ID_set": bool(os.environ.get("EBAY_APP_ID")),
+        "EBAY_CERT_ID_set": bool(os.environ.get("EBAY_CERT_ID")),
+        "EBAY_APP_ID_preview": os.environ.get("EBAY_APP_ID", "NOT SET")[:20],
     }
