@@ -988,6 +988,18 @@ function computeReversalScore(card) {
 // --- Peer Undervalued ---
 let _peerGroups = null;
 
+function _getRarityTier(card) {
+    // Group rarities into comparable tiers
+    const r = (card["rarity-name"] || "").toLowerCase();
+    if (r.includes("illustration") || r.includes("special art") || r.includes("hyper") || r.includes("secret") || r.includes("gold"))
+        return "ultra";
+    if (r.includes("full art") || r.includes("rainbow") || r.includes("alt"))
+        return "ultra";
+    if (r.includes("holo") || r.includes("rare") || r.includes("ex") || r.includes("gx") || r.includes("v "))
+        return "holo";
+    return "standard";
+}
+
 function _buildPeerGroups() {
     if (_peerGroups !== null) return _peerGroups;
     const nameRegex = /^(.+?)(?:\s+(?:#|\[|ex\b|EX\b|V\b|VMAX\b|VSTAR\b|GX\b|BREAK\b))/;
@@ -1000,16 +1012,19 @@ function _buildPeerGroups() {
         const match = nameRegex.exec(raw);
         const pokemon = match ? match[1].trim() : raw.split("#")[0].trim();
         if (!pokemon || pokemon.length < 3) continue;
-        if (!groups[pokemon]) groups[pokemon] = [];
-        groups[pokemon].push(psa10);
+        // Group by Pokemon + rarity tier so commons don't compare against ultra rares
+        const tier = _getRarityTier(c);
+        const key = pokemon + "|" + tier;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(psa10);
     }
     _peerGroups = {};
-    for (const [name, prices] of Object.entries(groups)) {
+    for (const [key, prices] of Object.entries(groups)) {
         if (prices.length < 3) continue;
         prices.sort((a, b) => a - b);
         const mid = Math.floor(prices.length / 2);
         const median = prices.length % 2 === 0 ? (prices[mid - 1] + prices[mid]) / 2 : prices[mid];
-        _peerGroups[name] = { median, count: prices.length, min: prices[0], max: prices[prices.length - 1] };
+        _peerGroups[key] = { median, count: prices.length, min: prices[0], max: prices[prices.length - 1] };
     }
     return _peerGroups;
 }
@@ -1019,14 +1034,16 @@ function computePeerUndervalued(card) {
     card._peerComps = null;
     if (card["is-sealed"]) return;
     const psa10 = Number(card["psa-10-price"]);
-    if (!Number.isFinite(psa10) || psa10 < 20) return;
+    if (!Number.isFinite(psa10) || psa10 < 50) return;  // $50 floor — below this isn't investable
     const raw = card["product-name"] || "";
     const nameRegex = /^(.+?)(?:\s+(?:#|\[|ex\b|EX\b|V\b|VMAX\b|VSTAR\b|GX\b|BREAK\b))/;
     const match = nameRegex.exec(raw);
     const pokemon = match ? match[1].trim() : raw.split("#")[0].trim();
     if (!pokemon || pokemon.length < 3) return;
+    const tier = _getRarityTier(card);
+    const key = pokemon + "|" + tier;
     const groups = _buildPeerGroups();
-    const peer = groups[pokemon];
+    const peer = groups[key];
     if (!peer) return;
     const discountFromMedian = (peer.median - psa10) / peer.median;
     if (discountFromMedian < 0.30) return;
