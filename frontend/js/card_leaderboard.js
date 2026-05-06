@@ -65,7 +65,7 @@ function cardEra(card) {
     return "unknown";
 }
 
-let view = "mustbuy";  // "mustbuy" | "trending" | "reversal" | "demandsurge" | "bestgrading" | "holds"
+let view = "mustbuy";  // "mustbuy" | "trending" | "reversal" | "undervalued" | "demandsurge" | "bestgrading" | "holds"
 
 // Constants used by computeEvScore (which feeds into Must Buy Now's hard gates).
 // No UI to tweak these now — Must Buy Now uses fixed defaults so the score is
@@ -985,6 +985,69 @@ function computeReversalScore(card) {
     card._reversalComps = { discountPct, vel30d, offBottom, nfPct, satIdx, ath, min1y };
 }
 
+// --- Peer Undervalued ---
+let _peerGroups = null;
+
+function _buildPeerGroups() {
+    if (_peerGroups !== null) return _peerGroups;
+    const nameRegex = /^(.+?)(?:\s+(?:#|\[|ex\b|EX\b|V\b|VMAX\b|VSTAR\b|GX\b|BREAK\b))/;
+    const groups = {};
+    for (const c of allCards) {
+        if (c["is-sealed"]) continue;
+        const psa10 = Number(c["psa-10-price"]);
+        if (!Number.isFinite(psa10) || psa10 <= 0) continue;
+        const raw = c["product-name"] || "";
+        const match = nameRegex.exec(raw);
+        const pokemon = match ? match[1].trim() : raw.split("#")[0].trim();
+        if (!pokemon || pokemon.length < 3) continue;
+        if (!groups[pokemon]) groups[pokemon] = [];
+        groups[pokemon].push(psa10);
+    }
+    _peerGroups = {};
+    for (const [name, prices] of Object.entries(groups)) {
+        if (prices.length < 3) continue;
+        prices.sort((a, b) => a - b);
+        const mid = Math.floor(prices.length / 2);
+        const median = prices.length % 2 === 0 ? (prices[mid - 1] + prices[mid]) / 2 : prices[mid];
+        _peerGroups[name] = { median, count: prices.length, min: prices[0], max: prices[prices.length - 1] };
+    }
+    return _peerGroups;
+}
+
+function computePeerUndervalued(card) {
+    card._peerScore = null;
+    card._peerComps = null;
+    if (card["is-sealed"]) return;
+    const psa10 = Number(card["psa-10-price"]);
+    if (!Number.isFinite(psa10) || psa10 < 20) return;
+    const raw = card["product-name"] || "";
+    const nameRegex = /^(.+?)(?:\s+(?:#|\[|ex\b|EX\b|V\b|VMAX\b|VSTAR\b|GX\b|BREAK\b))/;
+    const match = nameRegex.exec(raw);
+    const pokemon = match ? match[1].trim() : raw.split("#")[0].trim();
+    if (!pokemon || pokemon.length < 3) return;
+    const groups = _buildPeerGroups();
+    const peer = groups[pokemon];
+    if (!peer) return;
+    const discountFromMedian = (peer.median - psa10) / peer.median;
+    if (discountFromMedian < 0.30) return;
+    const clamp01 = v => Math.max(0, Math.min(1, v));
+    const discountScore = clamp01((discountFromMedian - 0.30) / 0.50) * 50;
+    const groupScore = clamp01((peer.count - 3) / 15) * 30;
+    const priceScore = clamp01(Math.log10(psa10 / 20) / 2) * 20;
+    const score = Math.round(discountScore + groupScore + priceScore);
+    card._peerScore = score;
+    card._peerComps = { pokemon, peerMedian: peer.median, peerCount: peer.count, discountFromMedian, peerMax: peer.max };
+}
+
+function filterUndervalued() {
+    const out = [];
+    for (const c of allCards) {
+        if (!Number.isFinite(c._peerScore) || c._peerScore < 10) continue;
+        out.push(c);
+    }
+    return out;
+}
+
 function filterHolds() {
     const numOrNull = (v) => (v === null || v === undefined || v === "") ? null : Number(v);
     const out = [];
@@ -1223,6 +1286,20 @@ function getSortValueReversal(card, key) {
     }
 }
 
+function getSortValueUndervalued(card, key) {
+    const d = card._peerComps || {};
+    switch (key) {
+        case "name":      return (card["product-name"] || "").toLowerCase();
+        case "set":       return (card["set-code"] || "").toLowerCase();
+        case "psa10":     return Number(card["psa-10-price"]) || 0;
+        case "median":    return d.peerMedian || 0;
+        case "discount":  return d.discountFromMedian || 0;
+        case "peers":     return d.peerCount || 0;
+        case "peerscore": return Number.isFinite(card._peerScore) ? card._peerScore : -Infinity;
+        default:           return 0;
+    }
+}
+
 function getSortValueHold(card, key) {
     const h = card._hold || {};
     switch (key) {
@@ -1247,6 +1324,7 @@ function sortList(list) {
         view === "holds"       ? getSortValueHold :
         view === "mustbuy"     ? getSortValueMustBuy :
         view === "reversal"    ? getSortValueReversal :
+        view === "undervalued" ? getSortValueUndervalued :
         view === "demandsurge" ? getSortValueDemandSurge :
         view === "bestgrading" ? getSortValueBestGrading :
                                   getSortValueTrend;  // safe fallback
@@ -1313,6 +1391,17 @@ const HEADERS = {
         { key: "offbottom", label: "OFF LOW" },
         { key: "revscore",  label: "SCORE \u25BC" },
     ],
+    undervalued: [
+        { key: "rank",      label: "#",          width: 50 },
+        { key: "none",      label: "IMAGE",      width: 60 },
+        { key: "name",      label: "CARD NAME" },
+        { key: "set",       label: "SET" },
+        { key: "psa10",     label: "PSA 10" },
+        { key: "median",    label: "PEER MEDIAN" },
+        { key: "discount",  label: "BELOW PEERS" },
+        { key: "peers",     label: "# PEERS" },
+        { key: "peerscore", label: "SCORE \u25BC" },
+    ],
     demandsurge: [
         { key: "rank",    label: "#",         width: 50 },
         { key: "none",    label: "IMAGE",     width: 60 },
@@ -1345,6 +1434,7 @@ function renderThead() {
         view === "holds"       ? HEADERS.holds :
         view === "mustbuy"     ? HEADERS.mustbuy :
         view === "reversal"    ? HEADERS.reversal :
+        view === "undervalued" ? HEADERS.undervalued :
         view === "demandsurge" ? HEADERS.demandsurge :
         view === "bestgrading" ? HEADERS.bestgrading :
                                   HEADERS.trending;  // safe fallback
@@ -1597,6 +1687,56 @@ function renderRowsReversal(list, start, count) {
             <td class="text-right"><span class="${esc(discountCls)}">${discountStr}</span></td>
             <td class="text-right"><span class="${esc(velCls)}">${velStr}</span></td>
             <td class="text-right"><span class="${esc(bottomCls)}">${bottomStr}</span></td>
+            <td class="text-right"><span class="${esc(scoreCls)}">${score}</span></td>
+        `;
+        tbody.appendChild(tr);
+    }
+    displayedCount = end;
+    updateLoadMore(list);
+}
+
+function renderRowsUndervalued(list, start, count) {
+    const tbody = document.getElementById("card-tbody");
+    if (start === 0) tbody.innerHTML = "";
+    const end = Math.min(start + count, list.length);
+    for (let i = start; i < end; i++) {
+        const c = list[i];
+        const d = c._peerComps || {};
+        const imgUrl = esc(c["image-url"] || "");
+        const cardId = c.id || "";
+        const setCode = esc(c["set-code"] || "");
+        const name    = esc(c["product-name"] || "\u2014");
+        const psa10 = Number(c["psa-10-price"]) || 0;
+        const median = d.peerMedian || 0;
+        const discount = d.discountFromMedian || 0;
+        const peers = d.peerCount || 0;
+        const score = c._peerScore || 0;
+
+        const tr = document.createElement("tr");
+        tr.className = "rowLink";
+        tr.dataset.href = `/card.html?id=${encodeURIComponent(cardId)}`;
+        tr.onclick = function(e) {
+            if (!e.target.closest("a")) window.location = this.dataset.href;
+        };
+
+        const discountStr = "-" + (discount * 100).toFixed(0) + "%";
+        const discountCls = discount >= 0.60 ? "mb-chip tier-strong"
+                          : discount >= 0.40 ? "mb-chip tier-solid"
+                                             : "mb-chip tier-weak";
+        const peersCls = peers >= 10 ? "chip chip-pos" : peers >= 5 ? "chip chip-neu" : "chip chip-neg";
+        const scoreCls = score >= 50 ? "mb-chip tier-strong"
+                       : score >= 30 ? "mb-chip tier-solid"
+                                     : "mb-chip tier-weak";
+
+        tr.innerHTML = `
+            <td class="text-center"><span class="${esc(rankClass(i + 1))}">${i + 1}</span></td>
+            <td>${imgUrl ? `<img src="${imgUrl}" alt="" style="width:56px;height:78px;object-fit:contain;" loading="lazy">` : "\u2014"}</td>
+            <td>${name}</td>
+            <td>${setCode}</td>
+            <td class="text-right text-mono">${money(psa10)}</td>
+            <td class="text-right text-mono" style="color:#606060;">${money(median)}</td>
+            <td class="text-right"><span class="${esc(discountCls)}">${discountStr}</span></td>
+            <td class="text-right"><span class="${esc(peersCls)}">${peers}</span></td>
             <td class="text-right"><span class="${esc(scoreCls)}">${score}</span></td>
         `;
         tbody.appendChild(tr);
@@ -1887,6 +2027,7 @@ function renderRows(list, start, count) {
     else if (view === "holds")         renderRowsHolds(list, start, count);
     else if (view === "mustbuy")       renderRowsMustBuy(list, start, count);
     else if (view === "reversal")      renderRowsReversal(list, start, count);
+    else if (view === "undervalued")   renderRowsUndervalued(list, start, count);
     else if (view === "demandsurge")   renderRowsDemandSurge(list, start, count);
     else if (view === "bestgrading")   renderRowsBestGrading(list, start, count);
     else                                renderRowsTrending(list, start, count);
@@ -2173,6 +2314,8 @@ function renderDistributionChart(list) {
 
 // --- full render (recompute + filter + sort + draw) ---
 function fullRender() {
+    // Invalidate peer group cache so it rebuilds with fresh data
+    _peerGroups = null;
     // Recompute scores (knobs may have changed)
     for (const c of allCards) {
         computeEvScore(c);                  // legacy, only used for sealed-card display
@@ -2180,6 +2323,7 @@ function fullRender() {
         computeMustBuyScore(c);             // 6-dimension smart-investor composite
         computeBestGradingScore(c);         // simple % uplift for Best Grading Play
         computeReversalScore(c);    // discount from ATH + confirmed bottom + early momentum
+        computePeerUndervalued(c);  // priced below peer group median
         computeTrendScore(c);                 // price velocity + demand acceleration for Trending Now
     }
     let list;
@@ -2187,6 +2331,7 @@ function fullRender() {
     else if (view === "holds")         list = filterHolds();
     else if (view === "mustbuy")       list = filterMustBuy();
     else if (view === "reversal")      list = filterReversal();
+    else if (view === "undervalued")   list = filterUndervalued();
     else if (view === "demandsurge")   list = filterDemandSurge();
     else if (view === "bestgrading")   list = filterBestGrading();
     else                                list = filterTrending();  // safe default
@@ -2244,12 +2389,14 @@ function wireToolbar() {
             const holdsCtrl = document.querySelector(".opp-controls-holds");
             const mbCtrl    = document.querySelector(".opp-controls-mustbuy");
             const revCtrl    = document.querySelector(".opp-controls-reversal");
+            const uvCtrl    = document.querySelector(".opp-controls-undervalued");
             const dsCtrl    = document.querySelector(".opp-controls-demandsurge");
             const bgCtrl    = document.querySelector(".opp-controls-bestgrading");
             if (trendCtrl)   trendCtrl.style.display   = (view === "trending")  ? "flex" : "none";
             if (holdsCtrl) holdsCtrl.style.display = (view === "holds")       ? "flex" : "none";
             if (mbCtrl)    mbCtrl.style.display    = (view === "mustbuy")     ? "flex" : "none";
             if (revCtrl)    revCtrl.style.display    = (view === "reversal")    ? "flex" : "none";
+            if (uvCtrl)    uvCtrl.style.display    = (view === "undervalued") ? "flex" : "none";
             if (dsCtrl)    dsCtrl.style.display    = (view === "demandsurge") ? "flex" : "none";
             if (bgCtrl)    bgCtrl.style.display    = (view === "bestgrading") ? "flex" : "none";
 
@@ -2260,6 +2407,7 @@ function wireToolbar() {
                                                              ? { key: "proj", dir: "desc" }
                                                              : { key: "mbscore", dir: "desc" };
             else if (view === "reversal")     currentSort = { key: "revscore",   dir: "desc" };
+            else if (view === "undervalued")  currentSort = { key: "peerscore",  dir: "desc" };
             else if (view === "demandsurge")  currentSort = { key: "ratio",      dir: "desc" };
             else if (view === "bestgrading")  currentSort = { key: "roi",        dir: "desc" };
             else                               currentSort = { key: "trendscore", dir: "desc" };

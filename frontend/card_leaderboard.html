@@ -48,6 +48,7 @@
         .opp-tab.trending.active     { color: #804000; background: #fff0d8; }
         .opp-tab.mustbuy.active      { color: #806000; background: #fff6d8; }
         .opp-tab.reversal.active     { color: #006040; background: #e0fff0; }
+        .opp-tab.undervalued.active  { color: #604000; background: #fff8e0; }
         .opp-tab.demandsurge.active  { color: #004080; background: #e4f0ff; }
         .opp-tab.bestgrading.active  { color: #006400; background: #e8ffe8; }
         .opp-tab.trending,
@@ -561,6 +562,7 @@
                 <button class="opp-tab mustbuy active"    data-view="mustbuy"><span class="tab-full">&#9889; Top Picks</span><span class="tab-short">&#9889; Picks</span></button>
                 <button class="opp-tab trending"         data-view="trending"><span class="tab-full">&#128293; Trending Now</span><span class="tab-short">&#128293; Hot</span></button>
                 <button class="opp-tab reversal"          data-view="reversal"><span class="tab-full">&#8635; Early Reversal</span><span class="tab-short">&#8635; Reversal</span></button>
+                <button class="opp-tab undervalued"       data-view="undervalued"><span class="tab-full">&#128176; Undervalued</span><span class="tab-short">&#128176; Value</span></button>
                 <button class="opp-tab demandsurge"       data-view="demandsurge"><span class="tab-full">&#128200; Demand Surge</span><span class="tab-short">&#128200; Surge</span></button>
                 <button class="opp-tab bestgrading"       data-view="bestgrading"><span class="tab-full">&#128142; Best Grading Play</span><span class="tab-short">&#128142; Grade</span></button>
                 <button class="opp-tab holds"             data-view="holds"><span class="tab-full">Long-Term Holds</span><span class="tab-short">Holds</span></button>
@@ -630,6 +632,12 @@
             <div class="opp-controls-reversal" style="display:none;">
                 <span class="opp-philosophy">Bottom fishing: cards just bouncing off lows with confirmed momentum</span>
                 <span class="opp-formula-note">Score = 30% discount from ATH + 25% confirmed bottom (above 1yr low) + 25% early momentum (30d rising) + 20% volume confirmation. Gated: ≥15% off ATH, price rising, above floor.</span>
+            </div>
+
+            <!-- Controls specific to Peer Undervalued view -->
+            <div class="opp-controls-undervalued" style="display:none;">
+                <span class="opp-philosophy">Mispriced: cards significantly cheaper than other versions of the same Pokemon</span>
+                <span class="opp-formula-note">Compares each card's PSA 10 price to the median of all cards sharing that Pokemon name. Score = 50% discount depth + 30% peer group size + 20% absolute price. Gated: ≥30% below peer median, 3+ peers.</span>
             </div>
 
             <!-- Controls specific to Long-Term Holds view -->
