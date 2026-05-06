@@ -1034,7 +1034,9 @@ function computePeerUndervalued(card) {
     card._peerComps = null;
     if (card["is-sealed"]) return;
     const psa10 = Number(card["psa-10-price"]);
-    if (!Number.isFinite(psa10) || psa10 < 50) return;  // $50 floor — below this isn't investable
+    if (!Number.isFinite(psa10) || psa10 < 100) return;
+
+    const numOrNull = (v) => (v === null || v === undefined || v === "") ? null : Number(v);
     const raw = card["product-name"] || "";
     const nameRegex = /^(.+?)(?:\s+(?:#|\[|ex\b|EX\b|V\b|VMAX\b|VSTAR\b|GX\b|BREAK\b))/;
     const match = nameRegex.exec(raw);
@@ -1045,13 +1047,39 @@ function computePeerUndervalued(card) {
     const groups = _buildPeerGroups();
     const peer = groups[key];
     if (!peer) return;
+
+    // HARD GATE: peer group must have proven $1000+ upside
+    // If the best card in this peer group hasn't hit $1000, the Pokemon
+    // doesn't have proven high-value demand at this rarity tier.
+    if (peer.max < 1000) return;
+
+    // Must be meaningfully below the peer median
     const discountFromMedian = (peer.median - psa10) / peer.median;
     if (discountFromMedian < 0.30) return;
+
+    // QUALITY GATE: card must show at least ONE bullish signal
+    // (was worth more before, has demand, or is trending up)
+    const ath = numOrNull(card["psa10-ath"]);
+    const p30 = numOrNull(card["psa10-30d-ago"]);
+    const nfPct = numOrNull(card["net-flow-pct"]);
+    const wasHigher = ath !== null && ath > psa10 * 1.2;  // ATH at least 20% above current
+    const hasDemand = nfPct !== null && nfPct > 0;
+    const priceRising = p30 !== null && p30 > 0 && psa10 > p30;
+    if (!wasHigher && !hasDemand && !priceRising) return;  // no bullish signal = dead money
+
     const clamp01 = v => Math.max(0, Math.min(1, v));
-    const discountScore = clamp01((discountFromMedian - 0.30) / 0.50) * 50;
-    const groupScore = clamp01((peer.count - 3) / 15) * 30;
-    const priceScore = clamp01(Math.log10(psa10 / 20) / 2) * 20;
-    const score = Math.round(discountScore + groupScore + priceScore);
+
+    // Score: 40% discount below peers + 25% upside potential (how high peers go)
+    //        + 20% quality signals + 15% peer confidence
+    const discountScore = clamp01((discountFromMedian - 0.30) / 0.50) * 40;
+    const upsideScore = clamp01(Math.log10(peer.max / psa10) / 1.5) * 25;  // 10x upside = max
+    let qualityScore = 0;
+    if (wasHigher) qualityScore += 8;
+    if (hasDemand) qualityScore += 7;
+    if (priceRising) qualityScore += 5;
+    const groupScore = clamp01((peer.count - 3) / 12) * 15;
+
+    const score = Math.round(discountScore + upsideScore + qualityScore + groupScore);
     card._peerScore = score;
     card._peerComps = { pokemon, peerMedian: peer.median, peerCount: peer.count, discountFromMedian, peerMax: peer.max };
 }
