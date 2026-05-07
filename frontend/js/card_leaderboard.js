@@ -1095,17 +1095,17 @@ function computePeerUndervalued(card) {
         gradingScore += clamp01((100 - psa10Pop) / 100) * 0.5;  // max 0.5 when pop near 0
     }
 
-    // Score: 30% discount + 20% upside + 15% pull rate + 15% grading scarcity
-    //        + 10% quality signals + 10% peer confidence
-    const discountScore = clamp01((discountFromMedian - 0.30) / 0.50) * 30;
-    const upsideScore = clamp01(Math.log10(peer.max / psa10) / 1.5) * 20;
-    const pullScore = pullRateScore * 15;
-    const gradeScore = gradingScore * 15;
+    // Score: 35% grading scarcity + 20% pull rate + 20% discount vs peers
+    //        + 15% upside potential + 10% quality signals
+    const gradeScore = gradingScore * 35;
+    const pullScore = pullRateScore * 20;
+    const discountScore = clamp01((discountFromMedian - 0.30) / 0.50) * 20;
+    const upsideScore = clamp01(Math.log10(peer.max / psa10) / 1.5) * 15;
     let qualityScore = 0;
     if (wasHigher) qualityScore += 4;
     if (hasDemand) qualityScore += 3;
     if (priceRising) qualityScore += 3;
-    const groupScore = clamp01((peer.count - 3) / 12) * 10;
+    const groupScore = 0;  // removed — peer count isn't worth score space
 
     const score = Math.round(discountScore + upsideScore + pullScore + gradeScore + qualityScore + groupScore);
     card._peerScore = score;
