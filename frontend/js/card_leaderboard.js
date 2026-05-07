@@ -1069,19 +1069,51 @@ function computePeerUndervalued(card) {
 
     const clamp01 = v => Math.max(0, Math.min(1, v));
 
-    // Score: 40% discount below peers + 25% upside potential (how high peers go)
-    //        + 20% quality signals + 15% peer confidence
-    const discountScore = clamp01((discountFromMedian - 0.30) / 0.50) * 40;
-    const upsideScore = clamp01(Math.log10(peer.max / psa10) / 1.5) * 25;  // 10x upside = max
-    let qualityScore = 0;
-    if (wasHigher) qualityScore += 8;
-    if (hasDemand) qualityScore += 7;
-    if (priceRising) qualityScore += 5;
-    const groupScore = clamp01((peer.count - 3) / 12) * 15;
+    // Pull rate proxy from rarity (higher rarity = harder to pull = more scarce)
+    const rarity = (card["rarity-name"] || "").toLowerCase();
+    let pullRateScore = 0;
+    if (rarity.includes("special illustration") || rarity.includes("hyper") || rarity.includes("secret") || rarity.includes("gold")) {
+        pullRateScore = 1.0;   // hardest to pull
+    } else if (rarity.includes("illustration") || rarity.includes("full art") || rarity.includes("rainbow") || rarity.includes("alt")) {
+        pullRateScore = 0.8;
+    } else if (rarity.includes("ultra") || rarity.includes("double rare")) {
+        pullRateScore = 0.6;
+    } else if (rarity.includes("holo") || rarity.includes("rare")) {
+        pullRateScore = 0.3;
+    }
 
-    const score = Math.round(discountScore + upsideScore + qualityScore + groupScore);
+    // Grading scarcity: low gem rate + low PSA 10 pop = extremely supply-constrained
+    const gemPct = numOrNull(card["gem-pct"]);
+    const psa10Pop = numOrNull(card["psa-10-pop"]);
+    let gradingScore = 0;
+    if (gemPct !== null) {
+        // Median gem rate is 0.4%. Below 0.2% = very hard to grade PSA 10.
+        gradingScore += clamp01((0.5 - gemPct) / 0.4) * 0.5;  // max 0.5 when gem rate near 0
+    }
+    if (psa10Pop !== null) {
+        // Median pop is 287. Under 50 = scarce, under 10 = ultra scarce.
+        gradingScore += clamp01((100 - psa10Pop) / 100) * 0.5;  // max 0.5 when pop near 0
+    }
+
+    // Score: 30% discount + 20% upside + 15% pull rate + 15% grading scarcity
+    //        + 10% quality signals + 10% peer confidence
+    const discountScore = clamp01((discountFromMedian - 0.30) / 0.50) * 30;
+    const upsideScore = clamp01(Math.log10(peer.max / psa10) / 1.5) * 20;
+    const pullScore = pullRateScore * 15;
+    const gradeScore = gradingScore * 15;
+    let qualityScore = 0;
+    if (wasHigher) qualityScore += 4;
+    if (hasDemand) qualityScore += 3;
+    if (priceRising) qualityScore += 3;
+    const groupScore = clamp01((peer.count - 3) / 12) * 10;
+
+    const score = Math.round(discountScore + upsideScore + pullScore + gradeScore + qualityScore + groupScore);
     card._peerScore = score;
-    card._peerComps = { pokemon, peerMedian: peer.median, peerCount: peer.count, discountFromMedian, peerMax: peer.max };
+    card._peerComps = {
+        pokemon, peerMedian: peer.median, peerCount: peer.count,
+        discountFromMedian, peerMax: peer.max,
+        gemPct, psa10Pop, pullRateScore,
+    };
 }
 
 function filterUndervalued() {
@@ -1339,7 +1371,8 @@ function getSortValueUndervalued(card, key) {
         case "psa10":     return Number(card["psa-10-price"]) || 0;
         case "median":    return d.peerMedian || 0;
         case "discount":  return d.discountFromMedian || 0;
-        case "peers":     return d.peerCount || 0;
+        case "pullrate":  return d.pullRateScore || 0;
+        case "gemrate":   return d.gemPct !== null ? d.gemPct : 999;  // lower gem = better, sort asc
         case "peerscore": return Number.isFinite(card._peerScore) ? card._peerScore : -Infinity;
         default:           return 0;
     }
@@ -1442,9 +1475,10 @@ const HEADERS = {
         { key: "name",      label: "CARD NAME" },
         { key: "set",       label: "SET" },
         { key: "psa10",     label: "PSA 10" },
-        { key: "median",    label: "PEER MEDIAN" },
-        { key: "discount",  label: "BELOW PEERS" },
-        { key: "peers",     label: "# PEERS" },
+        { key: "median",    label: "PEER MED" },
+        { key: "discount",  label: "VS PEERS" },
+        { key: "pullrate",  label: "PULL" },
+        { key: "gemrate",   label: "GEM %" },
         { key: "peerscore", label: "SCORE \u25BC" },
     ],
     demandsurge: [
@@ -1754,7 +1788,8 @@ function renderRowsUndervalued(list, start, count) {
         const psa10 = Number(c["psa-10-price"]) || 0;
         const median = d.peerMedian || 0;
         const discount = d.discountFromMedian || 0;
-        const peers = d.peerCount || 0;
+        const pullRate = d.pullRateScore || 0;
+        const gemPct = d.gemPct;
         const score = c._peerScore || 0;
 
         const tr = document.createElement("tr");
@@ -1768,9 +1803,15 @@ function renderRowsUndervalued(list, start, count) {
         const discountCls = discount >= 0.60 ? "mb-chip tier-strong"
                           : discount >= 0.40 ? "mb-chip tier-solid"
                                              : "mb-chip tier-weak";
-        const peersCls = peers >= 10 ? "chip chip-pos" : peers >= 5 ? "chip chip-neu" : "chip chip-neg";
-        const scoreCls = score >= 50 ? "mb-chip tier-strong"
-                       : score >= 30 ? "mb-chip tier-solid"
+        const pullLabels = { 1.0: "Ultra", 0.8: "Rare+", 0.6: "Rare", 0.3: "Holo" };
+        const pullStr = pullLabels[pullRate] || "\u2014";
+        const pullCls = pullRate >= 0.8 ? "chip chip-pos" : pullRate >= 0.5 ? "chip chip-neu" : "chip chip-neg";
+        const gemStr = gemPct !== null ? (gemPct * 100).toFixed(1) + "%" : "\u2014";
+        const gemCls = gemPct !== null && gemPct < 0.003 ? "chip chip-pos"     // < 0.3% = very hard
+                     : gemPct !== null && gemPct < 0.005 ? "chip chip-neu"
+                                                         : "chip chip-neg";
+        const scoreCls = score >= 60 ? "mb-chip tier-strong"
+                       : score >= 35 ? "mb-chip tier-solid"
                                      : "mb-chip tier-weak";
 
         tr.innerHTML = `
@@ -1781,7 +1822,8 @@ function renderRowsUndervalued(list, start, count) {
             <td class="text-right text-mono">${money(psa10)}</td>
             <td class="text-right text-mono" style="color:#606060;">${money(median)}</td>
             <td class="text-right"><span class="${esc(discountCls)}">${discountStr}</span></td>
-            <td class="text-right"><span class="${esc(peersCls)}">${peers}</span></td>
+            <td class="text-right"><span class="${esc(pullCls)}">${pullStr}</span></td>
+            <td class="text-right"><span class="${esc(gemCls)}">${gemStr}</span></td>
             <td class="text-right"><span class="${esc(scoreCls)}">${score}</span></td>
         `;
         tbody.appendChild(tr);
