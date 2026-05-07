@@ -1095,12 +1095,12 @@ function computePeerUndervalued(card) {
         gradingScore += clamp01((100 - psa10Pop) / 100) * 0.5;  // max 0.5 when pop near 0
     }
 
-    // Score: 40% grading scarcity + 20% pull rate + 18% discount vs peers
-    //        + 12% upside potential + 10% quality signals
-    const gradeScore = gradingScore * 40;
-    const pullScore = pullRateScore * 20;
-    const discountScore = clamp01((discountFromMedian - 0.30) / 0.50) * 18;
-    const upsideScore = clamp01(Math.log10(peer.max / psa10) / 1.5) * 12;
+    // Score: 45% grading scarcity + 25% pull rate + 20% upside potential
+    //        + 10% quality signals
+    const gradeScore = gradingScore * 45;
+    const pullScore = pullRateScore * 25;
+    const discountScore = 0;
+    const upsideScore = clamp01(Math.log10(peer.max / psa10) / 1.5) * 20;
     let qualityScore = 0;
     if (wasHigher) qualityScore += 4;
     if (hasDemand) qualityScore += 3;
